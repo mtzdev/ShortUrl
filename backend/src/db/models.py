@@ -20,10 +20,9 @@ class Link:
     __tablename__ = 'links'
 
     id: Mapped[int] = mapped_column(init=False, primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'))
+    user_id: Mapped[Optional[int]] = mapped_column(ForeignKey('users.id'), nullable=True)
     original_url: Mapped[str] = mapped_column(nullable=False)
     short_url: Mapped[str] = mapped_column(unique=True)
-    password: Mapped[Optional[str]] = mapped_column(nullable=True)
-    is_public: Mapped[bool] = mapped_column(default=True)
+    password: Mapped[Optional[str]] = mapped_column(nullable=True, default=None)
     clicks: Mapped[int] = mapped_column(default=0)
     created_at: Mapped[datetime] = mapped_column(init=False, server_default=func.now())

@@ -1,8 +1,8 @@
 """Criação tabela users e links
 
-Revision ID: e48020f141f9
+Revision ID: 720e574372e9
 Revises: 
-Create Date: 2025-05-03 18:01:49.889557
+Create Date: 2025-05-05 22:58:16.574491
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'e48020f141f9'
+revision: str = '720e574372e9'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -33,11 +33,10 @@ def upgrade() -> None:
     )
     op.create_table('links',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.Column('user_id', sa.Integer(), nullable=True),
     sa.Column('original_url', sa.String(), nullable=False),
     sa.Column('short_url', sa.String(), nullable=False),
     sa.Column('password', sa.String(), nullable=True),
-    sa.Column('is_public', sa.Boolean(), nullable=False),
     sa.Column('clicks', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
