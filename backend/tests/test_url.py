@@ -69,3 +69,38 @@ def test_create_url_with_password(client, db_session):
 
     assert link.password is not None
 
+def test_get_stats_success(client, simple_url):
+    response = client.get(f'/api/stats/{simple_url.short_url}')
+
+    assert response.status_code == 200
+    assert response.json()['original_url'] == simple_url.original_url
+    assert response.json()['short_url'] == simple_url.short_url
+    assert response.json()['clicks'] == 0
+    assert response.json()['created_at']
+
+def test_get_stats_with_invalid_link(client):
+    response = client.get('/api/stats/abcde')
+
+    assert response.status_code == 404
+    assert response.json()['detail'] == 'Link not found'
+
+def test_get_stats_with_protected_link(client, protected_url):
+    response = client.get(f'/api/stats/{protected_url.short_url}')
+
+    assert response.status_code == 401
+    assert response.json()['detail'] == 'Link is password protected'
+
+def test_get_stats_with_invalid_password(client, protected_url):
+    response = client.get(f'/api/stats/{protected_url.short_url}', headers={'password': 'wrong_password'})
+
+    assert response.status_code == 401
+    assert response.json()['detail'] == 'Invalid password'
+
+def test_get_stats_with_password(client, protected_url):
+    response = client.get(f'/api/stats/{protected_url.short_url}', headers={'password': protected_url.clean_password})
+
+    assert response.status_code == 200
+    assert response.json()['original_url'] == protected_url.original_url
+    assert response.json()['short_url'] == protected_url.short_url
+    assert response.json()['clicks'] == 0
+    assert response.json()['created_at']

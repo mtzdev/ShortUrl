@@ -16,3 +16,9 @@ class LinkCreateResponseSchema(BaseModel):
 
 class LinkPublicSchema(BaseModel):
     original_url: str
+
+class LinkStatsSchema(BaseModel):
+    original_url: str
+    short_url: str
+    clicks: int
+    created_at: datetime

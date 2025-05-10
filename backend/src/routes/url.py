@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header
 from src.db.models import Link
 from src.db.database import get_db
 from sqlalchemy.orm import Session
-from src.schemas import LinkCreateSchema, LinkCreateResponseSchema, LinkPublicSchema
+from src.schemas import LinkCreateSchema, LinkCreateResponseSchema, LinkPublicSchema, LinkStatsSchema
 from src.utils import validate_short_url
 from src.security import generate_password_hash, verify_password
 
@@ -44,3 +44,17 @@ def create_url(url: LinkCreateSchema, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(link)
     return link
+
+@router.get('/stats/{short_id}', response_model=LinkStatsSchema)
+def get_stats(short_id: str, password: str = Header(default=None), db: Session = Depends(get_db)):
+    link = db.query(Link).filter(Link.short_url == short_id).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Link not found")
+
+    if link.password:
+        if not password:
+            raise HTTPException(status_code=401, detail="Link is password protected")
+        if not verify_password(password, link.password):
+            raise HTTPException(status_code=401, detail="Invalid password")
+
+    return {'original_url': link.original_url, 'short_url': link.short_url, 'clicks': link.clicks, 'created_at': link.created_at}
