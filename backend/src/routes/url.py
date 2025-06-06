@@ -19,11 +19,18 @@ def get_url(short_id: str, password: str = Header(default=None), db: Session = D
     if link.password and not verify_password(password, link.password):
         raise HTTPException(status_code=401, detail="Invalid password")
 
+    return {'original_url': link.original_url, 'clicks': link.clicks, 'created_at': link.created_at}
+
+@router.post('/click/{short_id}')
+def click_url(short_id: str, db: Session = Depends(get_db)):
+    link = db.query(Link).filter(Link.short_url == short_id).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Link not found")
+
     link.clicks += 1
     db.commit()
     db.refresh(link)
-
-    return {'original_url': link.original_url}
+    return {'message': 'Link clicked successfully'}
 
 @router.post('/short', response_model=LinkCreateResponseSchema)
 def create_url(url: LinkCreateSchema, db: Session = Depends(get_db)):
