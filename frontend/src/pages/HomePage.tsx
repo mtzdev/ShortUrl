@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link as LinkIcon } from 'lucide-react';
+import Popup from '../components/Popup';
 
 const HomePage = () => {
   const [url, setUrl] = useState('');
@@ -7,21 +8,53 @@ const HomePage = () => {
   const [useCustomSlug, setUseCustomSlug] = useState(false);
   const [shortUrl, setShortUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [popupTitle, setPopupTitle] = useState('');
+  const [popupDescription, setPopupDescription] = useState<string | undefined>();  
+  const [showPopup, setShowPopup] = useState(false);
+  const apiUrl = import.meta.env.VITE_API_BASE_URL;
 
-  const handleSubmit = (e: React.FormEvent) => {
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // TODO: Simulate API call
-    setTimeout(() => {
-      const slug = useCustomSlug && customSlug ? customSlug : generateRandomSlug();
-      setShortUrl(`encurtarlinks.com.br/${slug}`);
-      setIsLoading(false);
-    }, 800);
-  };
 
-  const generateRandomSlug = () => {
-    return Math.random().toString(36).substring(2, 8);
+    try {
+      const response = await fetch(`${apiUrl}/short`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          original_url: url,
+          short_url: useCustomSlug ? customSlug : undefined,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        if (data.detail === 'Invalid short URL') {
+          setPopupTitle('O link curto inserido é inválido!');
+          setPopupDescription('Use de 3 a 16 caracteres, apenas letras, números e hífens.');
+          setShowPopup(true);
+        } else if (data.detail === 'Short URL already exists') {
+          setPopupTitle('Link encurtado já existe!');
+          setPopupDescription('O link curto inserido já está em uso. Por favor, escolha outro.');
+          setShowPopup(true);
+        } else {
+          setPopupTitle('Ocorreu um erro ao encurtar o link!');
+          setPopupDescription(data.detail || 'Erro inesperado. Tente novamente mais tarde.');
+          setShowPopup(true);
+        }
+        return;
+      }
+
+      setShortUrl(`encurtarlinks.com.br/${data.short_url}`);
+    } catch (err) {
+      setPopupTitle(err instanceof Error ? err.message : 'Erro ao encurtar link');
+      setShowPopup(true);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -167,6 +200,7 @@ const HomePage = () => {
           </div>
         </div>
       </div>
+      {showPopup && <Popup title={popupTitle} description={popupDescription} onClose={() => setShowPopup(false)} />}
     </div>
   );
 };
