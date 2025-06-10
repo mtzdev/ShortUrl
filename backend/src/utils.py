@@ -20,3 +20,17 @@ def generate_short_url(db):
         if not db.query(Link).filter(Link.short_url == short_url).first():
             db.close()
             return short_url
+
+def validate_email(email: str) -> bool:
+    if not email or len(email) > 254:
+        return False
+
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+
+    if not re.match(pattern, email):
+        return False
+
+    if '..' in email:
+        return False
+
+    return True

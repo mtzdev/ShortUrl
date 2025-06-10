@@ -24,3 +24,17 @@ class LinkStatsSchema(BaseModel):
     short_url: str
     clicks: int
     created_at: datetime
+
+class LoginRequestSchema(BaseModel):
+    email: str
+    password: str
+
+class RegisterRequestSchema(BaseModel):
+    username: str
+    email: str
+    password: str
+    confirm_password: str
+
+class LoginResponseSchema(BaseModel):
+    access_token: str
+    token_type: str
