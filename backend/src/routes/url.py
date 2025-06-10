@@ -53,15 +53,12 @@ def create_url(url: LinkCreateSchema, db: Session = Depends(get_db)):
     return link
 
 @router.get('/stats/{short_id}', response_model=LinkStatsSchema)
-def get_stats(short_id: str, password: str = Header(default=None), db: Session = Depends(get_db)):
+def get_stats(short_id: str, db: Session = Depends(get_db)):  # TODO: Validar se o short_id é um link ou slug, se for link, obter apenas o slug
     link = db.query(Link).filter(Link.short_url == short_id).first()
     if not link:
         raise HTTPException(status_code=404, detail="Link not found")
 
-    if link.password:
-        if not password:
-            raise HTTPException(status_code=401, detail="Link is password protected")
-        if not verify_password(password, link.password):
-            raise HTTPException(status_code=401, detail="Invalid password")
+    if link.password:  # Links com senha só o usuário que criou pode ver as estatísticas
+        raise HTTPException(status_code=401, detail="Link is password protected")
 
     return {'original_url': link.original_url, 'short_url': link.short_url, 'clicks': link.clicks, 'created_at': link.created_at}

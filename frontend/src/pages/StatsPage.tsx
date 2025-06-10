@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { Search, ExternalLink, Calendar, BarChart2 } from 'lucide-react';
 
 interface LinkStats {
-  originalUrl: string;
-  shortUrl: string;
+  original_url: string;
+  short_url: string;
   clicks: number;
-  createdAt: string;
+  created_at: string;
 }
 
 const StatsPage = () => {
@@ -13,28 +13,35 @@ const StatsPage = () => {
   const [stats, setStats] = useState<LinkStats | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const apiUrl = import.meta.env.VITE_API_BASE_URL;
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!slug) return;
 
     setIsLoading(true);
     setHasSearched(true);
 
-    // TODO: Simulate API call
-    setTimeout(() => {
-      if (slug === 'demo' || slug === 'exemplo') {
-        setStats({
-          originalUrl: 'https://example.com/this/is/a/very/long/url/that/needs/to/be/shortened',
-          shortUrl: `encurtarlinks.com.br/${slug}`,
-          clicks: 235,
-          createdAt: new Date().toLocaleDateString('pt-BR'),
-        });
-      } else {
-        setStats(null);
+    try {
+      const response = await fetch(`${apiUrl}/stats/${slug}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch link stats');
       }
+
+      const data = await response.json();
+      setStats(data);
+    } catch (error) {
+      console.error('Error fetching link stats:', error);
+      setStats(null);
+    } finally {
       setIsLoading(false);
-    }, 800);
+    }
   };
 
   return (
@@ -42,7 +49,7 @@ const StatsPage = () => {
       <div className="text-center mb-10">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Estatísticas de Links</h1>
         <p className="text-lg text-gray-600 dark:text-gray-300">
-          Visualize informações detalhadas sobre qualquer link encurtado
+          Visualize informações detalhadas sobre qualquer link público encurtado
         </p>
       </div>
 
@@ -94,12 +101,12 @@ const StatsPage = () => {
                     </div>
                     <div className="sm:w-3/4 break-all text-gray-900 dark:text-white">
                       <a 
-                        href={stats.originalUrl} 
+                        href={stats.original_url} 
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                       >
-                        {stats.originalUrl}
+                        {stats.original_url}
                       </a>
                     </div>
                   </div>
@@ -111,9 +118,11 @@ const StatsPage = () => {
                     </div>
                     <div className="sm:w-3/4 text-gray-900 dark:text-white font-medium">
                       <div className="flex items-center">
-                        <span>{stats.shortUrl}</span>
+                        <a href={`https://encurtarlinks.com.br/${stats.short_url}`} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                          {`https://encurtarlinks.com.br/${stats.short_url}`}
+                        </a>
                         <button
-                          onClick={() => navigator.clipboard.writeText(`https://${stats.shortUrl}`)}
+                          onClick={() => navigator.clipboard.writeText(`https://encurtarlinks.com.br/${stats.short_url}`)}
                           className="ml-2 p-1 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
                           title="Copiar link"
                         >
@@ -141,7 +150,14 @@ const StatsPage = () => {
                       <span>Criado em</span>
                     </div>
                     <div className="sm:w-3/4 text-gray-900 dark:text-white">
-                      {stats.createdAt}
+                      {new Date(stats.created_at).toLocaleString('pt-BR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                      })}
                     </div>
                   </div>
                 </div>
@@ -168,7 +184,9 @@ const StatsPage = () => {
           Dica Profissional
         </h2>
         <p className="text-blue-700 dark:text-blue-400">
-          Cadastre-se em nossa plataforma para acessar estatísticas avançadas, histórico completo e links personalizados ilimitados.
+          Apenas os links encurtados por usuários anônimos (não cadastrados) estão disponíveis nesta página de estatísticas.
+          <br />
+          Para visualizar estatísticas de links associados à sua conta, <a href="/perfil" className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors">clique aqui</a>.
         </p>
       </div>
     </div>
