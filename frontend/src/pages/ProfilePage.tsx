@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Key, X } from 'lucide-react';
+import { User, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+
 
 interface UserProfile {
   username: string;
@@ -8,15 +9,15 @@ interface UserProfile {
 }
 
 interface Link {
-  id: string;
-  originalUrl: string;
-  shortUrl: string;
+  id: number;
+  original_url: string;
+  short_url: string;
   clicks: number;
-  createdAt: string;
+  created_at: string;
 }
 
 const ProfilePage = () => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [links, setLinks] = useState<Link[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -30,11 +31,22 @@ const ProfilePage = () => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const apiUrl = import.meta.env.VITE_API_BASE_URL;
 
   useEffect(() => {
     const fetchProfile = async () => {
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
+
       try {
-        const response = await fetch('/api/user');
+        const response = await fetch(`${apiUrl}/auth/me`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
         if (response.ok) {
           const data = await response.json();
           setProfile(data);
@@ -47,7 +59,7 @@ const ProfilePage = () => {
     };
 
     fetchProfile();
-  }, []);
+  }, [token]);
 
   const handleUsernameSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,27 +213,27 @@ const ProfilePage = () => {
                     links.map((link) => (
                       <tr key={link.id}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                          {link.originalUrl}
+                          {link.original_url}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           <a
-                            href={`https://${link.shortUrl}`}
+                            href={`https://${link.short_url}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
                           >
-                            {link.shortUrl}
+                            {link.short_url}
                           </a>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                           {link.clicks}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {link.createdAt}
+                          {link.created_at}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <button
-                            onClick={() => navigator.clipboard.writeText(`https://${link.shortUrl}`)}
+                            onClick={() => navigator.clipboard.writeText(`https://${link.short_url}`)}
                             className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
                           >
                             Copiar
