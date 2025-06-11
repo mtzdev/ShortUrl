@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from src.db.database import get_db
 from src.db.models import User
-from src.security import verify_password, generate_password_hash, generate_jwt_token
+from src.security import get_user, verify_password, generate_password_hash, generate_jwt_token
 from sqlalchemy.orm import Session
 from src.utils import validate_email
 from src.schemas import LoginRequestSchema, RegisterRequestSchema, LoginResponseSchema
@@ -41,3 +41,10 @@ def register(register: RegisterRequestSchema, db: Session = Depends(get_db)):  #
     db.refresh(user)
 
     return generate_jwt_token(user.id, user.username)
+
+@router.get('/me')
+def get_current_user(request: Request, db: Session = Depends(get_db)):
+    user = get_user(request, db)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token or user not found')
+    return user

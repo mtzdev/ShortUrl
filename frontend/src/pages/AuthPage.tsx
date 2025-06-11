@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { authService } from '../services/auth';
+import { useAuth } from '../contexts/AuthContext';
 
 type FormType = 'login' | 'register';
 
@@ -7,41 +10,68 @@ const AuthPage = () => {
   const [formType, setFormType] = useState<FormType>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string>('');
+  const navigate = useNavigate();
+  const { login } = useAuth();
 
-  // Login form state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
-  // Register form state
   const [username, setUsername] = useState('');
   const [registerEmail, setRegisterEmail] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // TODO: Simulate API call
-    setTimeout(() => {
+    setError('');
+    
+    try {
+      await login(loginEmail, loginPassword);
+      
+      navigate('/');
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Erro inesperado no login');
+    } finally {
       setIsLoading(false);
-      // TODO: Handle login success - would redirect in a real app
-      console.log('Login submitted', { loginEmail, loginPassword });
-    }, 1000);
+    }
   };
 
-  const handleRegisterSubmit = (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // TODO: Simulate API call
-    setTimeout(() => {
+    setError('');
+
+    if (registerPassword !== confirmPassword) {
+      setError('As senhas não coincidem');
       setIsLoading(false);
-      // TODO: Handle registration success - would redirect in a real app
-      console.log('Registration submitted', { username, registerEmail, registerPassword });
-    }, 1000);
+      return;
+    }
+    
+    try {
+      const response = await authService.register({
+        username,
+        email: registerEmail,
+        password: registerPassword,
+        confirm_password: confirmPassword,
+      });
+      
+      localStorage.setItem('token', response.access_token);
+      
+      await login(registerEmail, registerPassword);
+      
+      navigate('/');
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Erro inesperado no cadastro');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const toggleFormType = () => {
     setFormType(formType === 'login' ? 'register' : 'login');
+    setError('');
   };
 
   return (
@@ -58,6 +88,12 @@ const AuthPage = () => {
                 : 'Registre-se para começar a criar links encurtados'}
             </p>
           </div>
+
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            </div>
+          )}
 
           {formType === 'login' ? (
             <form onSubmit={handleLoginSubmit} className="space-y-6">
