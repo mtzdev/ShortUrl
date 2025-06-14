@@ -21,6 +21,15 @@ def generate_short_url(db):
             db.close()
             return short_url
 
+def validate_username(username: str) -> bool:
+    if len(username) < 3 or len(username) > 16:
+        return False
+
+    if not re.match(r'^[a-zA-Z0-9_-]{3,16}$', username):
+        return False
+
+    return True
+
 def validate_email(email: str) -> bool:
     if not email or len(email) > 254:
         return False
@@ -31,6 +40,18 @@ def validate_email(email: str) -> bool:
         return False
 
     if '..' in email:
+        return False
+
+    return True
+
+def validate_password(password: str) -> bool:
+    if len(password) < 8:
+        return False
+
+    if not re.search(r'[a-zA-Z]', password):
+        return False
+
+    if not re.search(r'[0-9]', password):
         return False
 
     return True

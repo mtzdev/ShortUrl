@@ -3,37 +3,32 @@ from src.db.database import get_db
 from src.db.models import User
 from src.security import get_user, verify_password, generate_password_hash, generate_jwt_token
 from sqlalchemy.orm import Session
-from src.utils import validate_email
 from src.schemas import LoginRequestSchema, RegisterRequestSchema, LoginResponseSchema
 
 router = APIRouter()
 
 @router.post('/login', response_model=LoginResponseSchema)
 def login(login: LoginRequestSchema, db: Session = Depends(get_db)):
-    if not validate_email(login.email):
-        raise HTTPException(status_code=400, detail='Invalid e-mail')
-
     user = db.query(User).filter(User.email == login.email).first()
     if not user:
-        raise HTTPException(status_code=401, detail='Invalid credentials')
+        raise HTTPException(status_code=401, detail='E-mail ou senha estão inválidos. Por favor, tente novamente.')
 
     if not verify_password(login.password, user.password):
-        raise HTTPException(status_code=401, detail='Invalid credentials')
+        raise HTTPException(status_code=401, detail='E-mail ou senha estão inválidos. Por favor, tente novamente.')
 
     return generate_jwt_token(user.id, user.username)
 
 @router.post('/register', response_model=LoginResponseSchema)
-def register(register: RegisterRequestSchema, db: Session = Depends(get_db)):  # TODO: sanitizar inputs
-    if not validate_email(register.email):
-        raise HTTPException(status_code=400, detail='Invalid e-mail')
-
-    # TODO: Adicionar validate password
-
+def register(register: RegisterRequestSchema, db: Session = Depends(get_db)):
     if register.password != register.confirm_password:
-        raise HTTPException(status_code=400, detail='Passwords do not match')
+        raise HTTPException(status_code=400, detail='As senhas não coincidem. Verifique se as senhas estão iguais.')
+
+    if db.query(User).filter(User.username == register.username).first():
+        raise HTTPException(status_code=409, detail='Nome de usuário já registrado. Por favor, tente outro nome de usuário.')
 
     if db.query(User).filter(User.email == register.email).first():
-        raise HTTPException(status_code=409, detail='E-mail already registered')
+        raise HTTPException(status_code=409, detail='E-mail já registrado. Por favor, tente outro e-mail.')
+
 
     user = User(username=register.username, email=register.email, password=generate_password_hash(register.password))
     db.add(user)

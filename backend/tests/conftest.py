@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from src.app import app
 from src.db.models import table_registry
 from src.db.database import get_db
-from src.db.models import Link
+from src.db.models import Link, User
 from src.security import generate_password_hash
 
 @fixture()
@@ -51,3 +51,15 @@ def protected_url(db_session: Session):
 
     url.clean_password = clean_password
     return url
+
+@fixture()
+def user(db_session: Session):
+    clean_password = 'password123'
+    user = User(username='User', email='user@test.com', password=generate_password_hash(clean_password))
+
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+
+    user.clean_password = clean_password
+    return user

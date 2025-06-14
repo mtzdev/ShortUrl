@@ -30,6 +30,31 @@ def test_get_protected_url_without_password(client, protected_url):
     assert response.status_code == 401
     assert response.json()['detail'] == 'Link is password protected'
 
+def test_click_url_not_found(client):
+    response = client.post('/api/click/abcde')
+
+    assert response.status_code == 404
+    assert response.json()['detail'] == 'Link not found'
+
+def test_increment_click_url(client, simple_url, db_session):
+    response = client.post(f'api/click/{simple_url.short_url}')
+
+    assert response.status_code == 200
+    assert response.json() == {'message': 'Link clicked successfully'}
+
+    link = db_session.query(Link).filter(Link.id == simple_url.id).first()
+    assert link.clicks == 1
+
+
+def test_increment_multiple_clicks(client, simple_url, db_session):
+    for _ in range(25):
+        response = client.post(f'api/click/{simple_url.short_url}')
+        assert response.status_code == 200
+        assert response.json() == {'message': 'Link clicked successfully'}
+
+    link = db_session.query(Link).filter(Link.id == simple_url.id).first()
+    assert link.clicks == 25
+
 def test_create_url_simple(client):
     response = client.post('/api/short', json={'original_url': 'https://www.google.com/'})
 

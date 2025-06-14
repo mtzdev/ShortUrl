@@ -6,11 +6,19 @@ import { useAuth } from '../contexts/AuthContext';
 
 type FormType = 'login' | 'register';
 
+interface ValidationErrors {
+  username?: string;
+  email?: string;
+  password?: string;
+  confirmPassword?: string;
+}
+
 const AuthPage = () => {
   const [formType, setFormType] = useState<FormType>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
   const navigate = useNavigate();
   const { login } = useAuth();
 
@@ -22,17 +30,94 @@ const AuthPage = () => {
   const [registerPassword, setRegisterPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
+  const validateUsername = (value: string): string | undefined => {
+    if (value.length < 3 || value.length > 16) {
+      return 'O nome de usuário deve possuir entre 3 a 16 caracteres';
+    }
+    if (!/^[a-zA-Z0-9_-]{3,16}$/.test(value)) {
+      return 'O nome de usuário deve conter apenas letras, números, underlines (_) ou hífens (-)';
+    }
+    return undefined;
+  };
+
+  const validateEmail = (value: string): string | undefined => {
+    if (!value) return 'O e-mail é obrigatório';
+    if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(value) || (value.length > 254)) {
+      return 'O e-mail inserido não é válido. Verifique se o e-mail está correto e tente novamente.';
+    }
+    if (value.includes('..')) return 'O e-mail contém caracteres inválidos. Verifique se o e-mail está correto e tente novamente.';
+    return undefined;
+  };
+
+  const validatePassword = (value: string): string | undefined => {
+    if (value.length < 8) {
+      return 'A senha deve ter no mínimo 8 caracteres';
+    }
+    if (!/[a-zA-Z]/.test(value)) {
+      return 'A senha deve conter pelo menos uma letra';
+    }
+    if (!/[0-9]/.test(value)) {
+      return 'A senha deve conter pelo menos um número';
+    }
+    return undefined;
+  };
+
+  const validateConfirmPassword = (value: string, password: string): string | undefined => {
+    if (value !== password) {
+      return 'As senhas não coincidem';
+    }
+    return undefined;
+  };
+
+  const handleUsernameBlur = () => {
+    const error = validateUsername(username);
+    setValidationErrors(prev => ({ ...prev, username: error }));
+  };
+
+  const handleEmailBlur = () => {
+    const error = validateEmail(registerEmail);
+    setValidationErrors(prev => ({ ...prev, email: error }));
+  };
+
+  const handlePasswordBlur = () => {
+    const error = validatePassword(registerPassword);
+    setValidationErrors(prev => ({ ...prev, password: error }));
+  };
+
+  const handleConfirmPasswordBlur = () => {
+    const error = validateConfirmPassword(confirmPassword, registerPassword);
+    setValidationErrors(prev => ({ ...prev, confirmPassword: error }));
+  };
+
+  const handleLoginEmailBlur = () => {
+    const error = validateEmail(loginEmail);
+    setValidationErrors(prev => ({ ...prev, email: error }));
+  };
+
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
     
+    const emailError = validateEmail(loginEmail);
+
+    if (emailError) {
+      setValidationErrors({
+        email: emailError,
+      });
+      setIsLoading(false);
+      return;
+    }
+    
     try {
       await login(loginEmail, loginPassword);
-      
       navigate('/');
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Erro inesperado no login');
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError('Erro inesperado no login. Por favor, tente novamente.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -43,8 +128,18 @@ const AuthPage = () => {
     setIsLoading(true);
     setError('');
 
-    if (registerPassword !== confirmPassword) {
-      setError('As senhas não coincidem');
+    const usernameError = validateUsername(username);
+    const emailError = validateEmail(registerEmail);
+    const passwordError = validatePassword(registerPassword);
+    const confirmPasswordError = validateConfirmPassword(confirmPassword, registerPassword);
+
+    if (usernameError || emailError || passwordError || confirmPasswordError) {
+      setValidationErrors({
+        username: usernameError,
+        email: emailError,
+        password: passwordError,
+        confirmPassword: confirmPasswordError
+      });
       setIsLoading(false);
       return;
     }
@@ -58,12 +153,14 @@ const AuthPage = () => {
       });
       
       localStorage.setItem('token', response.access_token);
-      
       await login(registerEmail, registerPassword);
-      
       navigate('/');
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Erro inesperado no cadastro');
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError('Erro inesperado no cadastro. Por favor, tente novamente.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -72,6 +169,17 @@ const AuthPage = () => {
   const toggleFormType = () => {
     setFormType(formType === 'login' ? 'register' : 'login');
     setError('');
+    setValidationErrors({});
+  };
+
+  const renderInputError = (field: keyof ValidationErrors) => {
+    const error = validationErrors[field];
+    if (!error) return null;
+    return (
+      <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+        {error}
+      </p>
+    );
   };
 
   return (
@@ -111,12 +219,16 @@ const AuthPage = () => {
                     type="email"
                     autoComplete="email"
                     required
-                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                    className={`block w-full pl-10 pr-3 py-3 border ${
+                      validationErrors.email ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
+                    } rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors`}
                     placeholder="seu@email.com"
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
+                    onBlur={handleLoginEmailBlur}
                   />
                 </div>
+                {renderInputError('email')}
               </div>
 
               <div>
@@ -205,12 +317,16 @@ const AuthPage = () => {
                     type="text"
                     autoComplete="username"
                     required
-                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                    className={`block w-full pl-10 pr-3 py-3 border ${
+                      validationErrors.username ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
+                    } rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors`}
                     placeholder="seunome"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
+                    onBlur={handleUsernameBlur}
                   />
                 </div>
+                {renderInputError('username')}
               </div>
 
               <div>
@@ -227,12 +343,16 @@ const AuthPage = () => {
                     type="email"
                     autoComplete="email"
                     required
-                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                    className={`block w-full pl-10 pr-3 py-3 border ${
+                      validationErrors.email ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
+                    } rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors`}
                     placeholder="seu@email.com"
                     value={registerEmail}
                     onChange={(e) => setRegisterEmail(e.target.value)}
+                    onBlur={handleEmailBlur}
                   />
                 </div>
+                {renderInputError('email')}
               </div>
 
               <div>
@@ -249,10 +369,13 @@ const AuthPage = () => {
                     type={showPassword ? 'text' : 'password'}
                     autoComplete="new-password"
                     required
-                    className="block w-full pl-10 pr-10 py-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                    className={`block w-full pl-10 pr-10 py-3 border ${
+                      validationErrors.password ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
+                    } rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors`}
                     placeholder="••••••••"
                     value={registerPassword}
                     onChange={(e) => setRegisterPassword(e.target.value)}
+                    onBlur={handlePasswordBlur}
                   />
                   <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
                     <button
@@ -268,6 +391,7 @@ const AuthPage = () => {
                     </button>
                   </div>
                 </div>
+                {renderInputError('password')}
               </div>
 
               <div>
@@ -284,18 +408,22 @@ const AuthPage = () => {
                     type={showPassword ? 'text' : 'password'}
                     autoComplete="new-password"
                     required
-                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                    className={`block w-full pl-10 pr-3 py-3 border ${
+                      validationErrors.confirmPassword ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
+                    } rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors`}
                     placeholder="••••••••"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
+                    onBlur={handleConfirmPasswordBlur}
                   />
                 </div>
+                {renderInputError('confirmPassword')}
               </div>
 
               <div>
                 <button
                   type="submit"
-                  disabled={isLoading || registerPassword !== confirmPassword}
+                  disabled={isLoading || Object.keys(validationErrors).length > 0}
                   className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {isLoading ? (
