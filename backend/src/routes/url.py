@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Header
 from src.db.models import Link
 from src.db.database import get_db
 from sqlalchemy.orm import Session
-from src.schemas import LinkCreateSchema, LinkCreateResponseSchema, LinkPublicSchema, LinkStatsSchema
+from src.schemas import LinkCreateSchema, LinkCreateResponseSchema, LinkPublicSchema, LinkStatsSchema, UserLinksResponseSchema, LinkUpdateSchema
 from src.utils import validate_short_url
-from src.security import generate_password_hash, verify_password
+from src.security import generate_password_hash, verify_password, get_user
 
 router = APIRouter()
 
@@ -62,3 +62,44 @@ def get_stats(short_id: str, db: Session = Depends(get_db)):  # TODO: Validar se
         raise HTTPException(status_code=401, detail="Link is password protected")
 
     return {'original_url': link.original_url, 'short_url': link.short_url, 'clicks': link.clicks, 'created_at': link.created_at}
+
+@router.get('/user/links', response_model=UserLinksResponseSchema)
+def get_user_links(user: dict = Depends(get_user), db: Session = Depends(get_db)):
+    if not user:
+        raise HTTPException(status_code=401, detail="You must be logged in to access this resource")
+
+    links = db.query(Link).filter(Link.user_id == user['id']).all()
+    return {'links': links}
+
+@router.patch('/short/{short_id}')
+def update_short_url(short_id: str, new_url: LinkUpdateSchema, user: dict = Depends(get_user), db: Session = Depends(get_db)):
+    if not user:
+        raise HTTPException(status_code=401, detail="You must be logged in to access this resource")
+
+    if not validate_short_url(new_url.short_url, db, auto_generate=False):
+        raise HTTPException(status_code=400, detail="Invalid short URL")
+
+    link = db.query(Link).filter(Link.short_url == short_id, Link.user_id == user['id']).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Link not found")
+
+    if link.short_url == new_url.short_url or db.query(Link).filter(Link.short_url == new_url.short_url).first():
+        raise HTTPException(status_code=400, detail="Short URL already exists")
+
+    link.short_url = new_url.short_url
+    db.commit()
+    db.refresh(link)
+    return {'message': 'Short URL updated successfully', 'short_url': link.short_url}
+
+@router.delete('/short/{short_id}')
+def delete_short_url(short_id: str, user: dict = Depends(get_user), db: Session = Depends(get_db)):
+    if not user:
+        raise HTTPException(status_code=401, detail="You must be logged in to access this resource")
+
+    link = db.query(Link).filter(Link.short_url == short_id, Link.user_id == user['id']).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Link not found")
+
+    db.delete(link)
+    db.commit()
+    return {'message': 'URL deleted successfully'}

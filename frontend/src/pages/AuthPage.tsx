@@ -71,27 +71,67 @@ const AuthPage = () => {
 
   const handleUsernameBlur = () => {
     const error = validateUsername(username);
-    setValidationErrors(prev => ({ ...prev, username: error }));
+    setValidationErrors(prev => {
+      const newErrors = { ...prev };
+      if (error) {
+        newErrors.username = error;
+      } else {
+        delete newErrors.username;
+      }
+      return newErrors;
+    });
   };
 
   const handleEmailBlur = () => {
     const error = validateEmail(registerEmail);
-    setValidationErrors(prev => ({ ...prev, email: error }));
+    setValidationErrors(prev => {
+      const newErrors = { ...prev };
+      if (error) {
+        newErrors.email = error;
+      } else {
+        delete newErrors.email;
+      }
+      return newErrors;
+    });
   };
 
   const handlePasswordBlur = () => {
     const error = validatePassword(registerPassword);
-    setValidationErrors(prev => ({ ...prev, password: error }));
+    setValidationErrors(prev => {
+      const newErrors = { ...prev };
+      if (error) {
+        newErrors.password = error;
+      } else {
+        delete newErrors.password;
+      }
+      return newErrors;
+    });
   };
 
   const handleConfirmPasswordBlur = () => {
     const error = validateConfirmPassword(confirmPassword, registerPassword);
-    setValidationErrors(prev => ({ ...prev, confirmPassword: error }));
+    setValidationErrors(prev => {
+      const newErrors = { ...prev };
+      if (error) {
+        newErrors.confirmPassword = error;
+      } else {
+        delete newErrors.confirmPassword;
+      }
+      return newErrors;
+    });
   };
 
   const handleLoginEmailBlur = () => {
     const error = validateEmail(loginEmail);
-    setValidationErrors(prev => ({ ...prev, email: error }));
+    setValidationErrors(prev => {
+      const newErrors = { ...prev };
+      if (error) {
+        newErrors.email = error;
+      } else {
+        delete newErrors.email;
+      }
+      return newErrors;
+    });
   };
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
@@ -423,7 +463,7 @@ const AuthPage = () => {
               <div>
                 <button
                   type="submit"
-                  disabled={isLoading || Object.keys(validationErrors).length > 0}
+                  disabled={isLoading || Object.values(validationErrors).some(error => error !== undefined)}
                   className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {isLoading ? (

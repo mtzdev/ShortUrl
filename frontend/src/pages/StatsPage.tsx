@@ -14,6 +14,7 @@ const StatsPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const apiUrl = import.meta.env.VITE_API_BASE_URL;
+  const baseUrl = import.meta.env.VITE_BASE_URL;
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +62,7 @@ const StatsPage = () => {
             </div>
             <input
               type="text"
-              placeholder="encurtarlinks.com.br/"
+              placeholder={`${baseUrl.replace('https://', '')}/`}
               className="block w-full pl-10 pr-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
               value={slug}
               onChange={(e) => setSlug(e.target.value)}
@@ -118,11 +119,11 @@ const StatsPage = () => {
                     </div>
                     <div className="sm:w-3/4 text-gray-900 dark:text-white font-medium">
                       <div className="flex items-center">
-                        <a href={`https://encurtarlinks.com.br/${stats.short_url}`} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                          {`https://encurtarlinks.com.br/${stats.short_url}`}
+                        <a href={`${baseUrl}/${stats.short_url}`} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                          {`${baseUrl}/${stats.short_url}`}
                         </a>
                         <button
-                          onClick={() => navigator.clipboard.writeText(`https://encurtarlinks.com.br/${stats.short_url}`)}
+                          onClick={() => navigator.clipboard.writeText(`${baseUrl}/${stats.short_url}`)}
                           className="ml-2 p-1 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
                           title="Copiar link"
                         >

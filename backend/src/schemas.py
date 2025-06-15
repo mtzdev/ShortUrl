@@ -67,3 +67,9 @@ class RegisterRequestSchema(BaseModel):
 class LoginResponseSchema(BaseModel):
     access_token: str
     token_type: str
+
+class UserLinksResponseSchema(BaseModel):
+    links: list[LinkStatsSchema]
+
+class LinkUpdateSchema(BaseModel):
+    short_url: str

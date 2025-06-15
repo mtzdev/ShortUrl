@@ -3,9 +3,12 @@ import string
 from random import choices
 from src.db.models import Link
 
-def validate_short_url(short_url: str | None, db = None):
+def validate_short_url(short_url: str | None, db = None, auto_generate = True):
     if not short_url or short_url.strip() == "":
-        return generate_short_url(db)
+        if auto_generate:
+            return generate_short_url(db)
+        else:
+            return False
 
     if not re.fullmatch(r"^[a-zA-Z0-9_-]{3,16}$", short_url):
         return False

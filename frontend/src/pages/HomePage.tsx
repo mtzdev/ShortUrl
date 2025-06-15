@@ -12,7 +12,7 @@ const HomePage = () => {
   const [popupDescription, setPopupDescription] = useState<string | undefined>();  
   const [showPopup, setShowPopup] = useState(false);
   const apiUrl = import.meta.env.VITE_API_BASE_URL;
-
+  const baseUrl = import.meta.env.VITE_BASE_URL;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +48,7 @@ const HomePage = () => {
         return;
       }
 
-      setShortUrl(`encurtarlinks.com.br/${data.short_url}`);
+      setShortUrl(`${baseUrl.replace('https://', '')}/${data.short_url}`);
     } catch (err) {
       setPopupTitle(err instanceof Error ? err.message : 'Erro ao encurtar link');
       setShowPopup(true);
@@ -127,7 +127,7 @@ const HomePage = () => {
                 </label>
                 <div className="flex rounded-md shadow-sm">
                   <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-sm">
-                    encurtarlinks.com.br/
+                    {baseUrl.replace('https://', '')}/
                   </span>
                   <input
                     type="text"
