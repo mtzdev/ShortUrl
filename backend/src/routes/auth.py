@@ -3,7 +3,7 @@ from src.db.database import get_db
 from src.db.models import User
 from src.security import get_user, verify_password, generate_password_hash, generate_jwt_token
 from sqlalchemy.orm import Session
-from src.schemas import LoginRequestSchema, RegisterRequestSchema, LoginResponseSchema
+from src.schemas import LoginRequestSchema, RegisterRequestSchema, LoginResponseSchema, UsernameUpdateSchema, EmailUpdateSchema, PasswordUpdateSchema
 
 router = APIRouter()
 
@@ -43,3 +43,45 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=401, detail='Invalid token or user not found')
     return user
+
+@router.patch('/me/username')
+def update_username(new: UsernameUpdateSchema, user: dict = Depends(get_user), db: Session = Depends(get_db)):
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token or user not found')
+
+    if db.query(User).filter(User.username == new.username).first():
+        raise HTTPException(status_code=409, detail='Username already registered. Please try another username.')
+
+    user_db = db.query(User).filter(User.id == user['id']).first()
+    user_db.username = new.username
+    db.commit()
+    return {'message': 'Username updated successfully'}
+
+@router.patch('/me/email')
+def update_email(new: EmailUpdateSchema, user: dict = Depends(get_user), db: Session = Depends(get_db)):
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token or user not found')
+
+    if db.query(User).filter(User.email == new.email).first():
+        raise HTTPException(status_code=409, detail='E-mail already registered. Please try another e-mail')
+
+    user_db = db.query(User).filter(User.id == user['id']).first()
+    user_db.email = new.email
+    db.commit()
+    return {'message': 'E-mail updated successfully'}
+
+@router.patch('/me/password')
+def update_password(new: PasswordUpdateSchema, user: dict = Depends(get_user), db: Session = Depends(get_db)):
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token or user not found')
+
+    user_db = db.query(User).filter(User.id == user['id']).first()
+    if not user_db:
+        raise HTTPException(status_code=401, detail='Invalid token or user not found')
+
+    if verify_password(new.password, user_db.password):
+        raise HTTPException(status_code=401, detail='The new password cannot be the same as the old password')
+
+    user_db.password = generate_password_hash(new.password)
+    db.commit()
+    return {'message': 'Password updated successfully'}

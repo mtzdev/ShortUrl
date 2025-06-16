@@ -13,6 +13,46 @@ interface ValidationErrors {
   confirmPassword?: string;
 }
 
+// Exported validation functions
+export const validateUsername = (value: string): string | undefined => {
+  if (value.length < 3 || value.length > 16) {
+    return 'O nome de usuário deve possuir entre 3 a 16 caracteres';
+  }
+  if (!/^[a-zA-Z0-9_-]{3,16}$/.test(value)) {
+    return 'O nome de usuário deve conter apenas letras, números, underlines (_) ou hífens (-)';
+  }
+  return undefined;
+};
+
+export const validateEmail = (value: string): string | undefined => {
+  if (!value) return 'O e-mail é obrigatório';
+  if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(value) || (value.length > 254)) {
+    return 'O e-mail inserido não é válido. Verifique se o e-mail está correto e tente novamente.';
+  }
+  if (value.includes('..')) return 'O e-mail contém caracteres inválidos. Verifique se o e-mail está correto e tente novamente.';
+  return undefined;
+};
+
+export const validatePassword = (value: string): string | undefined => {
+  if (value.length < 8) {
+    return 'A senha deve ter no mínimo 8 caracteres';
+  }
+  if (!/[a-zA-Z]/.test(value)) {
+    return 'A senha deve conter pelo menos uma letra';
+  }
+  if (!/[0-9]/.test(value)) {
+    return 'A senha deve conter pelo menos um número';
+  }
+  return undefined;
+};
+
+export const validateConfirmPassword = (value: string, password: string): string | undefined => {
+  if (value !== password) {
+    return 'As senhas não coincidem';
+  }
+  return undefined;
+};
+
 const AuthPage = () => {
   const [formType, setFormType] = useState<FormType>('login');
   const [showPassword, setShowPassword] = useState(false);
@@ -30,44 +70,7 @@ const AuthPage = () => {
   const [registerPassword, setRegisterPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  const validateUsername = (value: string): string | undefined => {
-    if (value.length < 3 || value.length > 16) {
-      return 'O nome de usuário deve possuir entre 3 a 16 caracteres';
-    }
-    if (!/^[a-zA-Z0-9_-]{3,16}$/.test(value)) {
-      return 'O nome de usuário deve conter apenas letras, números, underlines (_) ou hífens (-)';
-    }
-    return undefined;
-  };
 
-  const validateEmail = (value: string): string | undefined => {
-    if (!value) return 'O e-mail é obrigatório';
-    if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(value) || (value.length > 254)) {
-      return 'O e-mail inserido não é válido. Verifique se o e-mail está correto e tente novamente.';
-    }
-    if (value.includes('..')) return 'O e-mail contém caracteres inválidos. Verifique se o e-mail está correto e tente novamente.';
-    return undefined;
-  };
-
-  const validatePassword = (value: string): string | undefined => {
-    if (value.length < 8) {
-      return 'A senha deve ter no mínimo 8 caracteres';
-    }
-    if (!/[a-zA-Z]/.test(value)) {
-      return 'A senha deve conter pelo menos uma letra';
-    }
-    if (!/[0-9]/.test(value)) {
-      return 'A senha deve conter pelo menos um número';
-    }
-    return undefined;
-  };
-
-  const validateConfirmPassword = (value: string, password: string): string | undefined => {
-    if (value !== password) {
-      return 'As senhas não coincidem';
-    }
-    return undefined;
-  };
 
   const handleUsernameBlur = () => {
     const error = validateUsername(username);

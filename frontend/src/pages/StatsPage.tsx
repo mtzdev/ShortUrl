@@ -24,7 +24,25 @@ const StatsPage = () => {
     setHasSearched(true);
 
     try {
-      const response = await fetch(`${apiUrl}/stats/${slug}`, {
+      let cleanSlug = slug;
+      
+      try {
+        // Check if it's a URL
+        if (slug.includes('/')) {
+          const url = new URL(slug.startsWith('http') ? slug : `http://${slug}`);
+          cleanSlug = url.pathname.split('/').filter(Boolean).pop() || '';
+        }
+      } catch {
+        // If URL parsing fails, assume it's just a slug
+        cleanSlug = slug.split('/').filter(Boolean).pop() || '';
+      }
+
+      // Validate slug format
+      if (!cleanSlug.match(/^[a-zA-Z0-9_-]{3,16}$/)) {
+        throw new Error('Invalid slug format');
+      }
+
+      const response = await fetch(`${apiUrl}/stats/${encodeURIComponent(cleanSlug)}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -172,7 +190,7 @@ const StatsPage = () => {
                 </div>
                 <h3 className="mt-2 text-xl font-medium text-gray-900 dark:text-white">Nenhum link encontrado</h3>
                 <p className="mt-1 text-gray-500 dark:text-gray-400">
-                  Tente pesquisar por outro link encurtado (dica: tente "demo" ou "exemplo").
+                  Tente pesquisar por outro link encurtado.
                 </p>
               </div>
             )}
@@ -185,9 +203,9 @@ const StatsPage = () => {
           Dica Profissional
         </h2>
         <p className="text-blue-700 dark:text-blue-400">
-          Apenas os links encurtados por usuários anônimos (não cadastrados) estão disponíveis nesta página de estatísticas.
+          Com uma conta cadastrada, você tem acesso a um painel centralizado com estatísticas completas de todos os seus links encurtados.
           <br />
-          Para visualizar estatísticas de links associados à sua conta, <a href="/perfil" className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors">clique aqui</a>.
+          Já possui uma conta? <a href="/perfil" className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"><b>Acesse seu painel</b></a> e visualize todas as suas estatísticas em um só lugar.
         </p>
       </div>
     </div>

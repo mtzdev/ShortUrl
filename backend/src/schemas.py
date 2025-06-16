@@ -73,3 +73,33 @@ class UserLinksResponseSchema(BaseModel):
 
 class LinkUpdateSchema(BaseModel):
     short_url: str
+
+class UsernameUpdateSchema(BaseModel):
+    username: str
+
+    @field_validator('username')
+    @classmethod
+    def validate_username(cls, value):
+        if not validate_username(value):
+            raise ValueError('O nome de usuário deve conter apenas letras, números, ou underlines e ter entre 3 e 16 caracteres.')
+        return value
+
+class EmailUpdateSchema(BaseModel):
+    email: EmailStr
+
+    @field_validator('email')
+    @classmethod
+    def validate_email(cls, value):
+        if not validate_email(value):
+            raise ValueError('O e-mail inserido não é válido. Verifique se o e-mail está correto e tente novamente.')
+        return value
+
+class PasswordUpdateSchema(BaseModel):
+    password: str
+
+    @field_validator('password')
+    @classmethod
+    def validate_password(cls, value):
+        if not validate_password(value):
+            raise ValueError('A senha deve conter no mínimo 8 caracteres, incluindo pelo menos uma letra e um número.')
+        return value

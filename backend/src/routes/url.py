@@ -33,7 +33,7 @@ def click_url(short_id: str, db: Session = Depends(get_db)):
     return {'message': 'Link clicked successfully'}
 
 @router.post('/short', response_model=LinkCreateResponseSchema)
-def create_url(url: LinkCreateSchema, db: Session = Depends(get_db)):
+def create_url(url: LinkCreateSchema, user: dict = Depends(get_user), db: Session = Depends(get_db)):
     validated_short = validate_short_url(url.short_url, db)
     if not validated_short:
         raise HTTPException(status_code=400, detail="Invalid short URL")
@@ -47,6 +47,9 @@ def create_url(url: LinkCreateSchema, db: Session = Depends(get_db)):
         url.password = generate_password_hash(url.password)
 
     link = Link(**url.model_dump(mode='json'))
+    if user:
+        link.user_id = user['id']
+
     db.add(link)
     db.commit()
     db.refresh(link)

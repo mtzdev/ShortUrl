@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, X, Edit3, Trash2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Popup from '../components/Popup';
+import { validateUsername, validateEmail, validatePassword, validateConfirmPassword } from './AuthPage';
 
 interface UserProfile {
   username: string;
@@ -210,25 +211,249 @@ const ProfilePage = () => {
 
   const handleUsernameSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Implement username update logic
-    closeModal();
+    
+    if (!newUsername.trim()) {
+      setPopupTitle('Erro de validação');
+      setPopupDescription('O nome de usuário é obrigatório.');
+      setShowPopup(true);
+      return;
+    }
+
+    const usernameError = validateUsername(newUsername);
+    if (usernameError) {
+      setPopupTitle('Nome de usuário inválido');
+      setPopupDescription(usernameError);
+      setShowPopup(true);
+      return;
+    }
+
+    if (newUsername === profile?.username) {
+      setPopupTitle('Nenhuma alteração detectada');
+      setPopupDescription('O nome de usuário digitado é igual ao atual.');
+      setShowPopup(true);
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(`${apiUrl}/auth/me/username`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: newUsername,
+        }),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        await fetchProfile(); // Refresh profile data
+        closeModal();
+        setPopupTitle('Nome de usuário atualizado!');
+        setPopupDescription('Seu nome de usuário foi alterado com sucesso.');
+        setShowPopup(true);
+      } else {
+        if (data.detail === 'Username already registered. Please try another username.') {
+          setPopupTitle('Nome de usuário já existe!');
+          setPopupDescription('O nome de usuário inserido já está em uso. Por favor, escolha outro.');
+          setShowPopup(true);
+        } else {
+          setPopupTitle('Erro ao atualizar nome de usuário');
+          setPopupDescription(data.detail || 'Não foi possível atualizar o nome de usuário. Tente novamente.');
+          setShowPopup(true);
+        }
+      }
+    } catch (error) {
+      setPopupTitle('Erro ao atualizar nome de usuário');
+      setPopupDescription('Ocorreu um erro inesperado. Tente novamente.');
+      setShowPopup(true);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement email update logic
-    closeModal();
+    
+    if (!currentEmail.trim() || !newEmail.trim() || !confirmEmail.trim()) {
+      setPopupTitle('Erro de validação');
+      setPopupDescription('Todos os campos são obrigatórios.');
+      setShowPopup(true);
+      return;
+    }
+
+    if (currentEmail !== profile?.email) {
+      setPopupTitle('E-mail atual incorreto');
+      setPopupDescription('O e-mail atual informado não confere com o e-mail da sua conta.');
+      setShowPopup(true);
+      return;
+    }
+
+    const emailError = validateEmail(newEmail);
+    if (emailError) {
+      setPopupTitle('E-mail inválido');
+      setPopupDescription(emailError);
+      setShowPopup(true);
+      return;
+    }
+
+    if (newEmail !== confirmEmail) {
+      setPopupTitle('E-mails não coincidem');
+      setPopupDescription('O novo e-mail e a confirmação devem ser iguais.');
+      setShowPopup(true);
+      return;
+    }
+
+    if (newEmail === profile?.email) {
+      setPopupTitle('Nenhuma alteração detectada');
+      setPopupDescription('O e-mail digitado é igual ao atual.');
+      setShowPopup(true);
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(`${apiUrl}/auth/me/email`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: newEmail,
+        }),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        await fetchProfile(); // Refresh profile data
+        closeModal();
+        setPopupTitle('E-mail atualizado!');
+        setPopupDescription('Seu e-mail foi alterado com sucesso.');
+        setShowPopup(true);
+      } else {
+        if (data.detail === 'E-mail already registered. Please try another e-mail') {
+          setPopupTitle('E-mail já existe!');
+          setPopupDescription('O e-mail inserido já está em uso. Por favor, escolha outro.');
+          setShowPopup(true);
+        } else {
+          setPopupTitle('Erro ao atualizar e-mail');
+          setPopupDescription(data.detail || 'Não foi possível atualizar o e-mail. Tente novamente.');
+          setShowPopup(true);
+        }
+      }
+    } catch (error) {
+      setPopupTitle('Erro ao atualizar e-mail');
+      setPopupDescription('Ocorreu um erro inesperado. Tente novamente.');
+      setShowPopup(true);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement password update logic
-    closeModal();
+    
+    if (!currentPassword.trim() || !newPassword.trim() || !confirmPassword.trim()) {
+      setPopupTitle('Erro de validação');
+      setPopupDescription('Todos os campos são obrigatórios.');
+      setShowPopup(true);
+      return;
+    }
+
+    const passwordError = validatePassword(newPassword);
+    if (passwordError) {
+      setPopupTitle('Senha inválida');
+      setPopupDescription(passwordError);
+      setShowPopup(true);
+      return;
+    }
+
+    const confirmError = validateConfirmPassword(confirmPassword, newPassword);
+    if (confirmError) {
+      setPopupTitle('Senhas não coincidem');
+      setPopupDescription(confirmError);
+      setShowPopup(true);
+      return;
+    }
+
+    if (currentPassword === newPassword) {
+      setPopupTitle('Senha igual à atual');
+      setPopupDescription('A nova senha deve ser diferente da senha atual.');
+      setShowPopup(true);
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // First verify current password by trying to login
+      const loginResponse = await fetch(`${apiUrl}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: profile?.email,
+          password: currentPassword,
+        }),
+      });
+
+      if (!loginResponse.ok) {
+        setPopupTitle('Senha atual incorreta');
+        setPopupDescription('A senha atual informada está incorreta.');
+        setShowPopup(true);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Now update the password
+      const response = await fetch(`${apiUrl}/auth/me/password`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          password: newPassword,
+        }),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        closeModal();
+        setPopupTitle('Senha atualizada!');
+        setPopupDescription('Sua senha foi alterada com sucesso.');
+        setShowPopup(true);
+      } else {
+        if (data.detail === 'The new password cannot be the same as the old password') {
+          setPopupTitle('Senha igual à atual');
+          setPopupDescription('A nova senha deve ser diferente da senha atual.');
+          setShowPopup(true);
+        } else {
+          setPopupTitle('Erro ao atualizar senha');
+          setPopupDescription(data.detail || 'Não foi possível atualizar a senha. Tente novamente.');
+          setShowPopup(true);
+        }
+      }
+    } catch (error) {
+      setPopupTitle('Erro ao atualizar senha');
+      setPopupDescription('Ocorreu um erro inesperado. Tente novamente.');
+      setShowPopup(true);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const openModal = (type: 'username' | 'email' | 'password') => {
     setModalType(type);
     resetFormStates();
+    
+    // Initialize form fields with current values
+    if (type === 'username' && profile?.username) {
+      setNewUsername(profile.username);
+    }
   };
 
   const closeModal = () => {
@@ -508,14 +733,14 @@ const ProfilePage = () => {
 
       {/* Modals */}
       {modalType && (
-        <div className="fixed inset-0 z-10 overflow-y-auto animate-fadeIn">
-          <div className="flex items-center justify-center min-h-screen px-4 py-8 text-center">
+        <div className="fixed inset-0 z-50 overflow-y-auto animate-fadeIn">
+          <div className="flex items-center justify-center min-h-screen px-4 py-8 text-center sm:p-0">
             <div className="fixed inset-0 transition-opacity" aria-hidden="true">
               <div className="absolute inset-0 bg-gray-500 dark:bg-gray-900 opacity-75"></div>
             </div>
 
-            <div className="inline-block w-full max-w-lg bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all animate-modalEntry">
-              <div className="px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+            <div className="inline-block w-full max-w-md sm:max-w-lg bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all animate-modalEntry my-8 align-middle">
+              <div className="px-6 pt-6 pb-4 sm:p-8 sm:pb-4">
                 <div className="sm:flex sm:items-start">
                   <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
                     <div className="flex justify-between items-center mb-4">
@@ -535,9 +760,9 @@ const ProfilePage = () => {
                     </div>
 
                     {modalType === 'username' && (
-                      <form onSubmit={handleUsernameSubmit} className="space-y-4">
+                      <form onSubmit={handleUsernameSubmit} className="space-y-6">
                         <div>
-                          <label htmlFor="new-username" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          <label htmlFor="new-username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Novo nome de usuário
                           </label>
                           <input
@@ -545,32 +770,47 @@ const ProfilePage = () => {
                             id="new-username"
                             value={newUsername}
                             onChange={(e) => setNewUsername(e.target.value)}
-                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+                            className="block w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+                            placeholder="Digite o novo nome de usuário"
+                            maxLength={16}
                             required
                           />
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            De 3 a 16 caracteres. Apenas letras, números, underlines (_) ou hífens (-).
+                          </p>
                         </div>
-                        <div className="flex justify-end space-x-3">
+                        <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 border-t border-gray-200 dark:border-gray-600">
                           <button
                             type="button"
                             onClick={closeModal}
-                            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+                            disabled={isSubmitting}
+                            className="w-full sm:w-auto px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           >
                             Cancelar
                           </button>
                           <button
                             type="submit"
-                            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            disabled={isSubmitting || !newUsername.trim()}
+                            className="w-full sm:w-auto px-6 py-3 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           >
-                            Salvar
+                            {isSubmitting ? (
+                              <span className="flex items-center justify-center">
+                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Salvando...
+                              </span>
+                            ) : 'Salvar Alterações'}
                           </button>
                         </div>
                       </form>
                     )}
 
                     {modalType === 'email' && (
-                      <form onSubmit={handleEmailSubmit} className="space-y-4">
+                      <form onSubmit={handleEmailSubmit} className="space-y-6">
                         <div>
-                          <label htmlFor="current-email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          <label htmlFor="current-email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             E-mail atual
                           </label>
                           <input
@@ -578,12 +818,16 @@ const ProfilePage = () => {
                             id="current-email"
                             value={currentEmail}
                             onChange={(e) => setCurrentEmail(e.target.value)}
-                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+                            className="block w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+                            placeholder="Digite seu e-mail atual"
                             required
                           />
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            Digite o e-mail atualmente vinculado à sua conta.
+                          </p>
                         </div>
                         <div>
-                          <label htmlFor="new-email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          <label htmlFor="new-email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Novo e-mail
                           </label>
                           <input
@@ -591,12 +835,13 @@ const ProfilePage = () => {
                             id="new-email"
                             value={newEmail}
                             onChange={(e) => setNewEmail(e.target.value)}
-                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+                            className="block w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+                            placeholder="Digite o novo e-mail"
                             required
                           />
                         </div>
                         <div>
-                          <label htmlFor="confirm-email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          <label htmlFor="confirm-email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Confirmar novo e-mail
                           </label>
                           <input
@@ -604,33 +849,43 @@ const ProfilePage = () => {
                             id="confirm-email"
                             value={confirmEmail}
                             onChange={(e) => setConfirmEmail(e.target.value)}
-                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+                            className="block w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+                            placeholder="Digite o novo e-mail novamente"
                             required
                           />
                         </div>
-                        <div className="flex justify-end space-x-3">
+                        <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 border-t border-gray-200 dark:border-gray-600">
                           <button
                             type="button"
                             onClick={closeModal}
-                            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+                            disabled={isSubmitting}
+                            className="w-full sm:w-auto px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           >
                             Cancelar
                           </button>
                           <button
                             type="submit"
-                            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                            disabled={newEmail !== confirmEmail}
+                            disabled={isSubmitting || newEmail !== confirmEmail || !newEmail.trim() || !confirmEmail.trim() || !currentEmail.trim()}
+                            className="w-full sm:w-auto px-6 py-3 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           >
-                            Salvar
+                            {isSubmitting ? (
+                              <span className="flex items-center justify-center">
+                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Salvando...
+                              </span>
+                            ) : 'Salvar Alterações'}
                           </button>
                         </div>
                       </form>
                     )}
 
                     {modalType === 'password' && (
-                      <form onSubmit={handlePasswordSubmit} className="space-y-4">
+                      <form onSubmit={handlePasswordSubmit} className="space-y-6">
                         <div>
-                          <label htmlFor="current-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          <label htmlFor="current-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Senha atual
                           </label>
                           <input
@@ -638,12 +893,16 @@ const ProfilePage = () => {
                             id="current-password"
                             value={currentPassword}
                             onChange={(e) => setCurrentPassword(e.target.value)}
-                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+                            className="block w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+                            placeholder="Digite sua senha atual"
                             required
                           />
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            Digite a senha que você usa atualmente para entrar na conta.
+                          </p>
                         </div>
                         <div>
-                          <label htmlFor="new-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          <label htmlFor="new-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Nova senha
                           </label>
                           <input
@@ -651,12 +910,16 @@ const ProfilePage = () => {
                             id="new-password"
                             value={newPassword}
                             onChange={(e) => setNewPassword(e.target.value)}
-                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+                            className="block w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+                            placeholder="Digite a nova senha"
                             required
                           />
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            Mínimo de 8 caracteres, incluindo pelo menos uma letra e um número.
+                          </p>
                         </div>
                         <div>
-                          <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Confirmar nova senha
                           </label>
                           <input
@@ -664,24 +927,34 @@ const ProfilePage = () => {
                             id="confirm-password"
                             value={confirmPassword}
                             onChange={(e) => setConfirmPassword(e.target.value)}
-                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+                            className="block w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+                            placeholder="Digite a nova senha novamente"
                             required
                           />
                         </div>
-                        <div className="flex justify-end space-x-3">
+                        <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 border-t border-gray-200 dark:border-gray-600">
                           <button
                             type="button"
                             onClick={closeModal}
-                            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+                            disabled={isSubmitting}
+                            className="w-full sm:w-auto px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           >
                             Cancelar
                           </button>
                           <button
                             type="submit"
-                            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                            disabled={newPassword !== confirmPassword}
+                            disabled={isSubmitting || newPassword !== confirmPassword || !newPassword.trim() || !confirmPassword.trim() || !currentPassword.trim()}
+                            className="w-full sm:w-auto px-6 py-3 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           >
-                            Salvar
+                            {isSubmitting ? (
+                              <span className="flex items-center justify-center">
+                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Salvando...
+                              </span>
+                            ) : 'Salvar Alterações'}
                           </button>
                         </div>
                       </form>
