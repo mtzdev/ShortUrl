@@ -7,7 +7,7 @@ from src.app import app
 from src.db.models import table_registry
 from src.db.database import get_db
 from src.db.models import Link, User
-from src.security import generate_password_hash
+from src.security import generate_password_hash, generate_jwt_token
 
 @fixture()
 def client(db_session: Session):
@@ -53,6 +53,15 @@ def protected_url(db_session: Session):
     return url
 
 @fixture()
+def url_with_user(db_session: Session, user: User):
+    url = Link(original_url='https://www.google.com/', short_url='abcde', user_id=user.id)
+    db_session.add(url)
+    db_session.commit()
+    db_session.refresh(url)
+
+    return url
+
+@fixture()
 def user(db_session: Session):
     clean_password = 'password123'
     user = User(username='User', email='user@test.com', password=generate_password_hash(clean_password))
@@ -61,5 +70,8 @@ def user(db_session: Session):
     db_session.commit()
     db_session.refresh(user)
 
+    jwt = generate_jwt_token(user.id, user.username)
+
     user.clean_password = clean_password
+    user.token_jwt = jwt['access_token']
     return user

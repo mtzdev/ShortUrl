@@ -63,6 +63,17 @@ def test_create_url_simple(client):
     assert response.json()['short_url']
     assert response.json()['created_at']
 
+def test_create_url_with_user(client, user, db_session):
+    response = client.post('/api/short', json={'original_url': 'https://www.google.com/'}, headers={'Authorization': f'Bearer {user.token_jwt}'})
+
+    assert response.status_code == 200
+    assert response.json()['original_url'] == 'https://www.google.com/'
+    assert response.json()['short_url']
+    assert response.json()['created_at']
+
+    link = db_session.query(Link).filter(Link.id == response.json()['id']).first()
+    assert link.user_id == user.id
+
 def test_create_url_with_short_url(client):
     response = client.post('/api/short', json={'original_url': 'https://www.google.com/', 'short_url': 'teste'})
 
@@ -114,3 +125,69 @@ def test_get_stats_with_protected_link(client, protected_url):
 
     assert response.status_code == 401
     assert response.json()['detail'] == 'Link is password protected'
+
+def test_get_all_user_links_with_invalid_user(client):
+    response = client.get('/api/user/links', headers={'Authorization': 'Bearer invalid_token'})
+
+    assert response.status_code == 401
+    assert response.json()['detail'] == 'You must be logged in to access this resource'
+
+def test_get_all_user_links_success(client, user, db_session):
+    db_session.add(Link(original_url='https://www.google.com/', short_url='teste1', user_id=user.id))
+    db_session.add(Link(original_url='https://www.google.com/', short_url='teste2', user_id=user.id))
+    db_session.commit()
+
+    response = client.get('/api/user/links', headers={'Authorization': f'Bearer {user.token_jwt}'})
+
+    assert response.status_code == 200
+    assert response.json()['links'][0]['original_url'] == 'https://www.google.com/'
+    assert response.json()['links'][1]['short_url'] == 'teste2'
+    assert len(response.json()['links']) == 2
+
+def test_update_short_url_with_invalid_user(client):
+    response = client.patch('/api/short/teste', json={'short_url': 'teste2'}, headers={'Authorization': 'Bearer invalid_token'})
+
+    assert response.status_code == 401
+    assert response.json()['detail'] == 'You must be logged in to access this resource'
+
+def test_update_short_url_with_invalid_short_url(client, url_with_user, user):
+    response = client.patch(f'/api/short/{url_with_user.short_url}', json={'short_url': 'a'}, headers={'Authorization': f'Bearer {user.token_jwt}'})
+
+    assert response.status_code == 400
+    assert response.json()['detail'] == 'Invalid short URL'
+
+def test_update_short_url_with_non_existent_link(client, user):
+    response = client.patch('/api/short/teste', json={'short_url': 'teste'}, headers={'Authorization': f'Bearer {user.token_jwt}'})
+
+    assert response.status_code == 404
+    assert response.json()['detail'] == 'Link not found'
+
+def test_update_short_url_with_duplicated_short_url(client, url_with_user, user):
+    response = client.patch(f'/api/short/{url_with_user.short_url}', json={'short_url': url_with_user.short_url}, headers={'Authorization': f'Bearer {user.token_jwt}'})
+
+    assert response.status_code == 400
+    assert response.json()['detail'] == 'Short URL already exists'
+
+def test_update_short_url_success(client, url_with_user, user):
+    response = client.patch(f'/api/short/{url_with_user.short_url}', json={'short_url': 'new_shorturl'}, headers={'Authorization': f'Bearer {user.token_jwt}'})
+
+    assert response.status_code == 200
+    assert response.json()['short_url'] == 'new_shorturl'
+
+def test_delete_short_url_with_invalid_user(client):
+    response = client.delete('/api/short/teste', headers={'Authorization': 'Bearer invalid_token'})
+
+    assert response.status_code == 401
+    assert response.json()['detail'] == 'You must be logged in to access this resource'
+
+def test_delete_short_url_with_non_existent_link(client, user):
+    response = client.delete('/api/short/teste', headers={'Authorization': f'Bearer {user.token_jwt}'})
+
+    assert response.status_code == 404
+    assert response.json()['detail'] == 'Link not found'
+
+def test_delete_short_url_success(client, url_with_user, user):
+    response = client.delete(f'/api/short/{url_with_user.short_url}', headers={'Authorization': f'Bearer {user.token_jwt}'})
+
+    assert response.status_code == 200
+    assert response.json() == {'message': 'URL deleted successfully'}

@@ -1,3 +1,5 @@
+from src.db.models import User
+
 def test_login_non_existent_user(client):
     response = client.post('/api/auth/login', json={'email': 'email@test.com', 'password': 'test_password'})
 
@@ -101,3 +103,75 @@ def test_register_success(client):
     assert response.json()
     assert 'access_token' in response.json()
     assert 'token_type' in response.json()
+
+def test_get_current_user_error(client):
+    response = client.get('/api/auth/me', headers={'Authorization': 'Bearer invalid_token'})
+
+    assert response.status_code == 401
+    assert response.json()['detail'] == 'Invalid token or user not found'
+
+def test_get_current_user_success(client, user):
+    response = client.get('/api/auth/me', headers={'Authorization': f'Bearer {user.token_jwt}'})
+
+    assert response.status_code == 200
+    assert response.json() == {'id': user.id, 'username': user.username, 'email': user.email}
+
+def test_update_username_with_invalid_user(client):
+    response = client.patch('/api/auth/me/username', json={'username': 'new_username'}, headers={'Authorization': 'Bearer invalid_token'})
+
+    assert response.status_code == 401
+    assert response.json()['detail'] == 'Invalid token or user not found'
+
+def test_update_username_with_duplicate_username(client, user):
+    response = client.patch('/api/auth/me/username', json={'username': user.username}, headers={'Authorization': f'Bearer {user.token_jwt}'})
+
+    assert response.status_code == 409
+    assert response.json()['detail'] == 'Username already registered. Please try another username.'
+
+def test_update_username_success(client, user, db_session):
+    response = client.patch('/api/auth/me/username', json={'username': 'new_username'}, headers={'Authorization': f'Bearer {user.token_jwt}'})
+
+    assert response.status_code == 200
+    assert response.json() == {'message': 'Username updated successfully'}
+
+    user_db = db_session.query(User).filter(User.id == user.id).first()
+    assert user_db.username == 'new_username'
+
+def test_update_email_with_invalid_user(client):
+    response = client.patch('/api/auth/me/email', json={'email': 'new@email.com'}, headers={'Authorization': 'Bearer invalid_token'})
+
+    assert response.status_code == 401
+    assert response.json()['detail'] == 'Invalid token or user not found'
+
+def test_update_email_with_duplicate_email(client, user):
+    response = client.patch('/api/auth/me/email', json={'email': user.email}, headers={'Authorization': f'Bearer {user.token_jwt}'})
+
+    assert response.status_code == 409
+    assert response.json()['detail'] == 'E-mail already registered. Please try another e-mail'
+
+def test_update_email_success(client, user, db_session):
+    response = client.patch('/api/auth/me/email', json={'email': 'new@email.com'}, headers={'Authorization': f'Bearer {user.token_jwt}'})
+
+    assert response.status_code == 200
+    assert response.json() == {'message': 'E-mail updated successfully'}
+
+    user_db = db_session.query(User).filter(User.id == user.id).first()
+    assert user_db.email == 'new@email.com'
+
+def test_update_password_with_invalid_user(client):
+    response = client.patch('/api/auth/me/password', json={'password': 'newpassword1'}, headers={'Authorization': 'Bearer invalid_token'})
+
+    assert response.status_code == 401
+    assert response.json()['detail'] == 'Invalid token or user not found'
+
+def test_update_password_with_same_password(client, user):
+    response = client.patch('/api/auth/me/password', json={'password': user.clean_password}, headers={'Authorization': f'Bearer {user.token_jwt}'})
+
+    assert response.status_code == 401
+    assert response.json()['detail'] == 'The new password cannot be the same as the old password'
+
+def test_update_password_success(client, user):
+    response = client.patch('/api/auth/me/password', json={'password': 'newpassword1'}, headers={'Authorization': f'Bearer {user.token_jwt}'})
+
+    assert response.status_code == 200
+    assert response.json() == {'message': 'Password updated successfully'}
