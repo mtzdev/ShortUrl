@@ -25,6 +25,7 @@ class LinkStatsSchema(BaseModel):
     short_url: str
     clicks: int
     created_at: datetime
+    has_password: bool = Field(default=False)
 
 class LoginRequestSchema(BaseModel):
     email: EmailStr
@@ -73,6 +74,9 @@ class UserLinksResponseSchema(BaseModel):
 
 class LinkUpdateSchema(BaseModel):
     short_url: str
+
+class LinkPasswordUpdateSchema(BaseModel):
+    password: str
 
 class UsernameUpdateSchema(BaseModel):
     username: str

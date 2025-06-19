@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, X, Edit3, Trash2 } from 'lucide-react';
+import { User, X, Edit3, Trash2, Eye, EyeOff, Lock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Popup from '../components/Popup';
 import { validateUsername, validateEmail, validatePassword, validateConfirmPassword } from './AuthPage';
@@ -15,14 +15,15 @@ interface Link {
   short_url: string;
   clicks: number;
   created_at: string;
+  has_password: boolean;
 }
 
 const ProfilePage = () => {
-  const { user, token } = useAuth();
+  const { token } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [links, setLinks] = useState<Link[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [modalType, setModalType] = useState<'username' | 'email' | 'password' | 'delete' | 'edit' | null>(null);
+  const [modalType, setModalType] = useState<'username' | 'email' | 'password' | 'delete' | 'edit' | 'create' | 'password-info' | null>(null);
   
   // Form states
   const [newUsername, setNewUsername] = useState('');
@@ -38,17 +39,83 @@ const ProfilePage = () => {
   const [newSlug, setNewSlug] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  // Create link states
+  const [createUrl, setCreateUrl] = useState('');
+  const [createUseCustomSlug, setCreateUseCustomSlug] = useState(false);
+  const [createCustomSlug, setCreateCustomSlug] = useState('');
+  const [createUsePassword, setCreateUsePassword] = useState(false);
+  const [createPassword, setCreatePassword] = useState('');
+  
+  // Validation error states
+  const [urlError, setUrlError] = useState('');
+  const [customSlugError, setCustomSlugError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  
   // Popup states
   const [popupTitle, setPopupTitle] = useState('');
   const [popupDescription, setPopupDescription] = useState<string | undefined>();
   const [showPopup, setShowPopup] = useState(false);
   
+  // Password update states
+  const [newLinkPassword, setNewLinkPassword] = useState('');
+  const [showLinkPassword, setShowLinkPassword] = useState(false);
+  const [linkPasswordError, setLinkPasswordError] = useState('');
+  
   const apiUrl = import.meta.env.VITE_API_BASE_URL;
   const baseUrl = import.meta.env.VITE_BASE_URL;
+
+
+  const formatLocalDate = (dateString: string) => {
+    const date = new Date(dateString + (dateString.includes('Z') ? '' : 'Z'));
+    return {
+      date: date.toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: '2-digit'
+      }),
+      time: date.toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    };
+  };
 
   const validateCustomSlug = (slug: string): boolean => {
     const regex = /^[a-zA-Z0-9-]{3,16}$/;
     return regex.test(slug);
+  };
+
+  const validateUrl = (url: string): string => {
+    if (!url.trim()) {
+      return 'URL é obrigatória';
+    }
+    try {
+      new URL(url);
+      return '';
+    } catch {
+      return 'URL inválida';
+    }
+  };
+
+  const validateCreateCustomSlug = (slug: string): string => {
+    if (!slug.trim()) {
+      return 'Link personalizado é obrigatório quando habilitado';
+    }
+    if (!validateCustomSlug(slug)) {
+      return 'Use de 3 a 16 caracteres, apenas letras, números e hífens';
+    }
+    return '';
+  };
+
+  const validateCreatePassword = (password: string): string => {
+    if (!password.trim()) {
+      return 'Senha é obrigatória quando habilitada';
+    }
+    if (password.length < 3) {
+      return 'Senha deve ter pelo menos 3 caracteres';
+    }
+    return '';
   };
 
   const fetchProfile = async () => {
@@ -85,7 +152,11 @@ const ProfilePage = () => {
       });
       if (response.ok) {
         const data = await response.json();
-        setLinks(data.links);
+        // Sort links by creation date (newest first)
+        const sortedLinks = data.links.sort((a: Link, b: Link) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        setLinks(sortedLinks);
       }
     } catch (error) {
       console.error('Failed to fetch user links:', error);
@@ -207,6 +278,139 @@ const ProfilePage = () => {
     setSelectedLink(link);
     setNewSlug(link.short_url);
     setModalType('edit');
+  };
+
+  const openPasswordInfoModal = (link: Link) => {
+    setSelectedLink(link);
+    setNewLinkPassword('');
+    setLinkPasswordError('');
+    setShowLinkPassword(false);
+    setModalType('password-info');
+  };
+
+  const handleUpdateLinkPassword = async () => {
+    if (!selectedLink || !token) return;
+
+    if (!newLinkPassword.trim()) {
+      setLinkPasswordError('A nova senha é obrigatória');
+      return;
+    }
+
+    if (newLinkPassword.length < 3) {
+      setLinkPasswordError('A senha deve ter pelo menos 3 caracteres');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setLinkPasswordError('');
+
+    try {
+      const response = await fetch(`${apiUrl}/short/${selectedLink.short_url}/password`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          password: newLinkPassword,
+        }),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        await fetchUserLinks(); // Refresh the links list
+        closeModal();
+        setPopupTitle('Senha atualizada com sucesso!');
+        setPopupDescription('A senha do link foi alterada com sucesso.');
+        setShowPopup(true);
+      } else if (data.detail === 'Password must be at least 3 characters long') {
+        setLinkPasswordError('A senha deve ter pelo menos 3 caracteres');
+      } else {
+        setLinkPasswordError('Não foi possível atualizar a senha. Tente novamente.');
+      }
+    } catch (error) {
+      setLinkPasswordError('Ocorreu um erro inesperado. Tente novamente.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCreateLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Reset previous errors
+    setUrlError('');
+    setCustomSlugError('');
+    setPasswordError('');
+    
+    // Validate fields
+    const urlValidationError = validateUrl(createUrl);
+    if (urlValidationError) {
+      setUrlError(urlValidationError);
+      return;
+    }
+    
+    if (createUseCustomSlug) {
+      const slugValidationError = validateCreateCustomSlug(createCustomSlug);
+      if (slugValidationError) {
+        setCustomSlugError(slugValidationError);
+        return;
+      }
+    }
+    
+    if (createUsePassword) {
+      const passwordValidationError = validateCreatePassword(createPassword);
+      if (passwordValidationError) {
+        setPasswordError(passwordValidationError);
+        return;
+      }
+    }
+
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(`${apiUrl}/short`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          original_url: createUrl,
+          short_url: createUseCustomSlug ? createCustomSlug : undefined,
+          password: createUsePassword ? createPassword : undefined,
+        }),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        await fetchUserLinks(); // Refresh the links list
+        closeModal();
+        setPopupTitle('Link criado com sucesso!');
+        setPopupDescription(`Seu link: ${baseUrl.replace('https://', '')}/${data.short_url}`);
+        setShowPopup(true);
+      } else {
+        if (data.detail === 'Invalid short URL') {
+          setCustomSlugError('Use de 3 a 16 caracteres, apenas letras, números e hífens');
+        } else if (data.detail === 'Short URL already exists') {
+          setCustomSlugError('Este link já está em uso. Escolha outro');
+        } else {
+          setPopupTitle('Erro ao criar link');
+          setPopupDescription(data.detail || 'Não foi possível criar o link. Tente novamente.');
+          setShowPopup(true);
+        }
+      }
+    } catch (error) {
+      setPopupTitle('Erro ao criar link');
+      setPopupDescription('Ocorreu um erro inesperado. Tente novamente.');
+      setShowPopup(true);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const openCreateModal = () => {
+    setModalType('create');
+    resetCreateFormStates();
   };
 
   const handleUsernameSubmit = async (e: React.FormEvent) => {
@@ -460,7 +664,11 @@ const ProfilePage = () => {
     setModalType(null);
     setSelectedLink(null);
     setNewSlug('');
+    setNewLinkPassword('');
+    setLinkPasswordError('');
+    setShowLinkPassword(false);
     resetFormStates();
+    resetCreateFormStates();
   };
 
   const resetFormStates = () => {
@@ -471,6 +679,18 @@ const ProfilePage = () => {
     setCurrentPassword('');
     setNewPassword('');
     setConfirmPassword('');
+  };
+
+  const resetCreateFormStates = () => {
+    setCreateUrl('');
+    setCreateUseCustomSlug(false);
+    setCreateCustomSlug('');
+    setCreateUsePassword(false);
+    setCreatePassword('');
+    setUrlError('');
+    setCustomSlugError('');
+    setPasswordError('');
+    setShowPassword(false);
   };
 
   if (isLoading) {
@@ -547,58 +767,92 @@ const ProfilePage = () => {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 gap-4">
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">Meus Links</h3>
-              <a
-                href="/"
+              <button
+                onClick={openCreateModal}
                 className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
               >
                 CRIAR LINK
-              </a>
+              </button>
             </div>
             
             {/* Mobile View */}
             <div className="block sm:hidden">
               {links.length === 0 ? (
-                <div className="p-6 text-center text-gray-500 dark:text-gray-400">
-                  Você ainda não criou nenhum link encurtado.
+                <div className="p-8 text-center">
+                  <div className="flex flex-col items-center justify-center">
+                    <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4">
+                      <svg className="w-8 h-8 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                      </svg>
+                    </div>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm">
+                      Você ainda não criou nenhum link encurtado.
+                    </p>
+                  </div>
                 </div>
               ) : (
-                <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {links.map((link) => (
-                    <div key={link.id} className="p-4 space-y-3">
+                <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                  {links.map((link, index) => (
+                    <div key={link.id} className={`p-5 space-y-4 ${index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-25 dark:bg-gray-825'}`}>
+                      {/* Header with URL and Password Badge */}
+                      <div className="space-y-2">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">URL Original:</p>
+                            <div className="text-sm text-gray-900 dark:text-white font-medium leading-relaxed">
+                              {link.original_url.length > 45 ? `${link.original_url.substring(0, 45)}...` : link.original_url}
+                            </div>
+                          </div>
+                          {link.has_password && (
+                            <button
+                              onClick={() => openPasswordInfoModal(link)}
+                              className="flex-shrink-0 ml-2 p-2 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/10 rounded-lg transition-all duration-200 hover:scale-110"
+                              title="Link protegido por senha - Clique para gerenciar"
+                            >
+                              <Lock className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Short URL */}
                       <div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">URL Original:</p>
-                        <div className="text-sm text-gray-900 dark:text-white text-left">
-                          {link.original_url.length > 50 ? `${link.original_url.substring(0, 50)}...` : link.original_url}
-                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Link Encurtado:</p>
+                        <a
+                          href={`${baseUrl}/${link.short_url}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
+                        >
+                          {baseUrl.replace('https://', '')}/{link.short_url}
+                        </a>
                       </div>
+
+                      {/* Stats Row */}
                       <div className="flex justify-between items-center">
-                        <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">Link Encurtado:</p>
-                          <a
-                            href={`${baseUrl}/${link.short_url}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-                          >
-                            {baseUrl.replace('https://', '')}/{link.short_url}
-                          </a>
+                        <div className="flex space-x-6">
+                          <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Cliques:</p>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                              {link.clicks.toLocaleString()}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Criado:</p>
+                            <p className="text-sm text-gray-900 dark:text-white font-medium">
+                              {formatLocalDate(link.created_at).date}
+                            </p>
+                            <p className="text-xs text-gray-400 dark:text-gray-500">
+                              {formatLocalDate(link.created_at).time}
+                            </p>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <p className="text-xs text-gray-500 dark:text-gray-400">Cliques:</p>
-                          <p className="text-sm font-medium text-gray-900 dark:text-white">{link.clicks}</p>
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">Criado em:</p>
-                          <p className="text-sm text-gray-900 dark:text-white">
-                            {new Date(link.created_at).toLocaleDateString('pt-BR')}
-                          </p>
-                        </div>
+
+                        {/* Action Buttons */}
                         <div className="flex space-x-1">
                           <button
                             onClick={() => navigator.clipboard.writeText(`${baseUrl}/${link.short_url}`)}
-                            className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all duration-200 hover:scale-110 active:scale-95 btn-press"
+                            className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/10 rounded-md transition-all duration-200 hover:scale-110"
                             title="Copiar link"
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -607,14 +861,14 @@ const ProfilePage = () => {
                           </button>
                           <button
                             onClick={() => openEditModal(link)}
-                            className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all duration-200 hover:scale-110 active:scale-95 btn-press"
+                            className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/10 rounded-md transition-all duration-200 hover:scale-110"
                             title="Editar link"
                           >
                             <Edit3 className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => openDeleteModal(link)}
-                            className="p-2 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-all duration-200 hover:scale-110 active:scale-95 btn-press"
+                            className="p-2 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-md transition-all duration-200 hover:scale-110"
                             title="Excluir link"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -629,75 +883,103 @@ const ProfilePage = () => {
 
             {/* Desktop View */}
             <div className="hidden sm:block">
-              <div className="overflow-hidden">
-                <table className="w-full divide-y divide-gray-200 dark:divide-gray-700 table-fixed">
-                  <thead className="bg-gray-50 dark:bg-gray-700">
+              <div className="overflow-x-auto">
+                <table className="w-full divide-y divide-gray-200 dark:divide-gray-700 table-fixed min-w-[800px]">
+                  <thead className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800">
                     <tr>
-                      <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider" style={{width: '35%'}}>
+                      <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider w-2/5">
                         URL Original
                       </th>
-                      <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider" style={{width: '25%'}}>
-                        URL Encurtado
+                      <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider w-1/5">
+                        Link Encurtado
                       </th>
-                      <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider" style={{width: '10%'}}>
+                      <th scope="col" className="px-4 py-4 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider w-1/6">
                         Cliques
                       </th>
-                      <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider" style={{width: '15%'}}>
-                        Data
+                      <th scope="col" className="px-4 py-4 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider w-1/6">
+                        Criado
                       </th>
-                      <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider" style={{width: '15%'}}>
+                      <th scope="col" className="px-4 py-4 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider w-1/6">
                         Ações
                       </th>
                     </tr>
                   </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
                   {links.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
-                        Você ainda não criou nenhum link encurtado.
+                      <td colSpan={5} className="px-4 py-12 text-center">
+                        <div className="flex flex-col items-center justify-center">
+                          <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4">
+                            <svg className="w-8 h-8 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                            </svg>
+                          </div>
+                          <p className="text-gray-500 dark:text-gray-400 text-sm">
+                            Você ainda não criou nenhum link encurtado.
+                          </p>
+                        </div>
                       </td>
                     </tr>
                   ) : (
-                    links.map((link) => (
-                      <tr key={link.id}>
-                        <td className="px-4 py-4 text-sm text-gray-900 dark:text-white">
+                    links.map((link, index) => (
+                                            <tr key={link.id} className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-25 dark:bg-gray-825'}`}>
+                        <td className="px-4 py-4">
                           <div className="group relative">
                             <div
-                              className="truncate max-w-xs cursor-help"
-                              title="Passe o mouse para ver URL completa"
+                              className="truncate cursor-help text-sm text-gray-900 dark:text-white font-medium"
+                              title="Clique para ver URL completa"
                             >
                               {link.original_url}
                             </div>
-                            <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block z-20 bg-gray-900 dark:bg-gray-700 text-white p-3 rounded-md shadow-xl text-xs max-w-sm break-all border border-gray-700 opacity-0 group-hover:opacity-100 transition-all duration-300 transform group-hover:translate-y-0 translate-y-1">
+                            <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block z-20 bg-gray-900 dark:bg-gray-700 text-white p-3 rounded-lg shadow-xl text-xs max-w-sm break-all border border-gray-700 opacity-0 group-hover:opacity-100 transition-all duration-300">
                               <div className="font-medium mb-1">URL Original:</div>
-                              {link.original_url}
-                              {/* Arrow pointing down */}
+                              <div className="text-gray-200">{link.original_url}</div>
                               <div className="absolute top-full left-4 border-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-4 text-sm">
-                          <a
-                            href={`${baseUrl}/${link.short_url}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 truncate block"
-                            title={`${baseUrl.replace('https://', '')}/${link.short_url}`}
-                          >
-                            {link.short_url}
-                          </a>
+                        <td className="px-4 py-4">
+                          <div className="flex items-center space-x-2">
+                            {link.has_password && (
+                              <div className="flex-shrink-0">
+                                <button
+                                  onClick={() => openPasswordInfoModal(link)}
+                                  className="p-1.5 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/10 rounded-md transition-all duration-200 hover:scale-110"
+                                  title="Link protegido por senha - Clique para gerenciar"
+                                >
+                                  <Lock className="w-4 h-4" />
+                                </button>
+                              </div>
+                            )}
+                            <a
+                              href={`${baseUrl}/${link.short_url}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium text-sm truncate"
+                              title={`${baseUrl.replace('https://', '')}/${link.short_url}`}
+                            >
+                              {link.short_url}
+                            </a>
+                          </div>
                         </td>
-                        <td className="px-4 py-4 text-sm text-gray-900 dark:text-white">
-                          {link.clicks}
+                        <td className="px-4 py-4 text-center">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                            {link.clicks.toLocaleString()}
+                          </span>
                         </td>
-                        <td className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
-                          {new Date(link.created_at).toLocaleDateString('pt-BR')}
+                        <td className="px-4 py-4 text-center">
+                          <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">
+                            {formatLocalDate(link.created_at).date}
+                          </div>
+                          <div className="text-xs text-gray-400 dark:text-gray-500">
+                            {formatLocalDate(link.created_at).time}
+                          </div>
                         </td>
-                        <td className="px-4 py-4 text-sm font-medium">
-                          <div className="flex justify-end space-x-1">
+                        <td className="px-4 py-4">
+                          <div className="flex justify-center space-x-1">
                             <button
                               onClick={() => navigator.clipboard.writeText(`${baseUrl}/${link.short_url}`)}
-                              className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all duration-200 hover:scale-110 active:scale-95 btn-press"
+                              className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/10 rounded-md transition-all duration-200 hover:scale-110"
                               title="Copiar link"
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -706,14 +988,14 @@ const ProfilePage = () => {
                             </button>
                             <button
                               onClick={() => openEditModal(link)}
-                              className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all duration-200 hover:scale-110 active:scale-95 btn-press"
+                              className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/10 rounded-md transition-all duration-200 hover:scale-110"
                               title="Editar link"
                             >
                               <Edit3 className="h-4 w-4" />
                             </button>
                             <button
                               onClick={() => openDeleteModal(link)}
-                              className="p-2 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-all duration-200 hover:scale-110 active:scale-95 btn-press"
+                              className="p-2 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-md transition-all duration-200 hover:scale-110"
                               title="Excluir link"
                             >
                               <Trash2 className="h-4 w-4" />
@@ -750,6 +1032,8 @@ const ProfilePage = () => {
                         {modalType === 'password' && 'Alterar senha'}
                         {modalType === 'delete' && 'Excluir Link'}
                         {modalType === 'edit' && 'Editar Link'}
+                        {modalType === 'create' && 'Criar Novo Link'}
+                        {modalType === 'password-info' && 'Link Protegido por Senha'}
                       </h3>
                       <button
                         onClick={closeModal}
@@ -1046,6 +1330,284 @@ const ProfilePage = () => {
                             className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:scale-105 active:scale-95 btn-press"
                           >
                             {isSubmitting ? 'Salvando...' : 'Confirmar'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {modalType === 'create' && (
+                      <form onSubmit={handleCreateLink} className="space-y-6">
+                        <div>
+                          <label htmlFor="create-url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Link original <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="url"
+                            id="create-url"
+                            value={createUrl}
+                            onChange={(e) => {
+                              setCreateUrl(e.target.value);
+                              if (urlError) setUrlError('');
+                            }}
+                            className={`block w-full px-3 py-3 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 sm:text-sm ${
+                              urlError 
+                                ? 'border-red-300 dark:border-red-600 focus:ring-red-500 focus:border-red-500' 
+                                : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500'
+                            } dark:bg-gray-700 dark:text-white`}
+                            placeholder="https://exemplo.com/meu-link-muito-longo"
+                            required
+                          />
+                          {urlError && (
+                            <p className="mt-1 text-xs text-red-600 dark:text-red-400">{urlError}</p>
+                          )}
+                        </div>
+
+                        <div className="flex items-center">
+                          <input
+                            id="use-custom-slug"
+                            name="use-custom-slug"
+                            type="checkbox"
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded transition-colors"
+                            checked={createUseCustomSlug}
+                            onChange={() => {
+                              setCreateUseCustomSlug(!createUseCustomSlug);
+                              if (!createUseCustomSlug) {
+                                setCreateCustomSlug('');
+                                setCustomSlugError('');
+                              }
+                            }}
+                          />
+                          <label htmlFor="use-custom-slug" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                            Personalizar link encurtado
+                          </label>
+                        </div>
+
+                        {createUseCustomSlug && (
+                          <div className="animate-fadeIn">
+                            <label htmlFor="create-custom-slug" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                              Link personalizado <span className="text-red-500">*</span>
+                            </label>
+                            <div className="flex rounded-md shadow-sm">
+                              <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-sm">
+                                {baseUrl.replace('https://', '')}/
+                              </span>
+                              <input
+                                type="text"
+                                id="create-custom-slug"
+                                maxLength={16}
+                                value={createCustomSlug}
+                                onChange={(e) => {
+                                  setCreateCustomSlug(e.target.value);
+                                  if (customSlugError) setCustomSlugError('');
+                                }}
+                                className={`flex-1 min-w-0 block w-full px-3 py-2 rounded-none rounded-r-md border sm:text-sm transition-colors ${
+                                  customSlugError 
+                                    ? 'border-red-300 dark:border-red-600 focus:ring-red-500 focus:border-red-500' 
+                                    : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500'
+                                } dark:bg-gray-700 dark:text-white`}
+                                placeholder="meu-link"
+                              />
+                            </div>
+                            {customSlugError && (
+                              <p className="mt-1 text-xs text-red-600 dark:text-red-400">{customSlugError}</p>
+                            )}
+                            {!customSlugError && (
+                              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                Máximo de 16 caracteres. Apenas letras, números e hífens.
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="flex items-center">
+                          <input
+                            id="use-password"
+                            name="use-password"
+                            type="checkbox"
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded transition-colors"
+                            checked={createUsePassword}
+                            onChange={() => {
+                              setCreateUsePassword(!createUsePassword);
+                              if (!createUsePassword) {
+                                setCreatePassword('');
+                                setPasswordError('');
+                              }
+                            }}
+                          />
+                          <label htmlFor="use-password" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                            Proteger com senha
+                          </label>
+                        </div>
+
+                                                 {createUsePassword && (
+                           <div className="animate-fadeIn">
+                             <label htmlFor="create-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                               Senha <span className="text-red-500">*</span>
+                             </label>
+                             <div className="relative">
+                               <input
+                                 type={showPassword ? "text" : "password"}
+                                 id="create-password"
+                                 value={createPassword}
+                                 onChange={(e) => {
+                                   setCreatePassword(e.target.value);
+                                   if (passwordError) setPasswordError('');
+                                 }}
+                                 className={`block w-full px-3 py-3 pr-10 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 sm:text-sm ${
+                                   passwordError 
+                                     ? 'border-red-300 dark:border-red-600 focus:ring-red-500 focus:border-red-500' 
+                                     : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500'
+                                 } dark:bg-gray-700 dark:text-white`}
+                                 placeholder="Digite uma senha segura"
+                               />
+                               <button
+                                 type="button"
+                                 onClick={() => setShowPassword(!showPassword)}
+                                 className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                               >
+                                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                               </button>
+                             </div>
+                             {passwordError && (
+                               <p className="mt-1 text-xs text-red-600 dark:text-red-400">{passwordError}</p>
+                             )}
+                             {!passwordError && (
+                               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                 Mínimo de 3 caracteres. Será necessária para acessar o link.
+                               </p>
+                             )}
+                           </div>
+                         )}
+
+                        <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 border-t border-gray-200 dark:border-gray-600">
+                          <button
+                            type="button"
+                            onClick={closeModal}
+                            disabled={isSubmitting}
+                            className="w-full sm:w-auto px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={isSubmitting || !createUrl.trim() || (createUseCustomSlug && !createCustomSlug.trim()) || (createUsePassword && !createPassword.trim())}
+                            className="w-full sm:w-auto px-6 py-3 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            {isSubmitting ? (
+                              <span className="flex items-center justify-center">
+                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Criando...
+                              </span>
+                            ) : 'Criar Link'}
+                          </button>
+                        </div>
+                      </form>
+                    )}
+
+                    {modalType === 'password-info' && selectedLink && (
+                      <div className="space-y-6">
+                        <div className="text-center">
+                          <div className="w-16 h-16 bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Lock className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+                          </div>
+                          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                            Gerenciar Proteção do Link
+                          </h3>
+                        </div>
+
+                        <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                          <p className="text-sm font-medium text-gray-900 dark:text-white break-all mb-2">
+                            {baseUrl.replace('https://', '')}/{selectedLink.short_url}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 break-all">
+                            → {selectedLink.original_url}
+                          </p>
+                        </div>
+
+                        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                          <h4 className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-2 flex items-center">
+                            <Lock className="w-4 h-4 mr-2" />
+                            Status da Proteção
+                          </h4>
+                          <ul className="text-sm text-amber-700 dark:text-amber-300 space-y-1">
+                            <li>• Este link está protegido por senha</li>
+                            <li>• A senha atual não pode ser visualizada por segurança</li>
+                            <li>• Você pode definir uma nova senha abaixo</li>
+                          </ul>
+                        </div>
+
+                        <div className="space-y-4">
+                          <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                            Alterar Senha do Link
+                          </h4>
+                          
+                          <div>
+                            <label htmlFor="new-link-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                              Nova senha <span className="text-red-500">*</span>
+                            </label>
+                            <div className="relative">
+                              <input
+                                type={showLinkPassword ? "text" : "password"}
+                                id="new-link-password"
+                                value={newLinkPassword}
+                                onChange={(e) => {
+                                  setNewLinkPassword(e.target.value);
+                                  if (linkPasswordError) setLinkPasswordError('');
+                                }}
+                                className={`block w-full px-3 py-3 pr-10 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 sm:text-sm ${
+                                  linkPasswordError 
+                                    ? 'border-red-300 dark:border-red-600 focus:ring-red-500 focus:border-red-500' 
+                                    : 'border-gray-300 dark:border-gray-600 focus:ring-amber-500 focus:border-amber-500'
+                                } dark:bg-gray-700 dark:text-white`}
+                                placeholder="Digite a nova senha..."
+                                disabled={isSubmitting}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowLinkPassword(!showLinkPassword)}
+                                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                              >
+                                {showLinkPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                              </button>
+                            </div>
+                            {linkPasswordError && (
+                              <p className="mt-2 text-sm text-red-600 dark:text-red-400">{linkPasswordError}</p>
+                            )}
+                            {!linkPasswordError && (
+                              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                Mínimo de 3 caracteres. A nova senha substituirá a atual.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 border-t border-gray-200 dark:border-gray-600">
+                          <button
+                            type="button"
+                            onClick={closeModal}
+                            disabled={isSubmitting}
+                            className="w-full sm:w-auto px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleUpdateLinkPassword}
+                            disabled={isSubmitting || !newLinkPassword.trim()}
+                            className="w-full sm:w-auto px-6 py-3 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            {isSubmitting ? (
+                              <span className="flex items-center justify-center">
+                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Atualizando...
+                              </span>
+                            ) : 'Alterar Senha'}
                           </button>
                         </div>
                       </div>

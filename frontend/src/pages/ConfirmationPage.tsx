@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { ExternalLink, Calendar, AlertTriangle, Loader2, CheckCircle, ArrowRight, X } from 'lucide-react';
+import { ExternalLink, Calendar, AlertTriangle, Loader2, CheckCircle, ArrowRight, X, Lock, Eye, EyeOff } from 'lucide-react';
 import Navbar from '../components/Navbar';
 
 interface LinkData {
@@ -15,28 +15,60 @@ const ConfirmationPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [isPasswordProtected, setIsPasswordProtected] = useState(false);
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isValidatingPassword, setIsValidatingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
   const apiUrl = import.meta.env.VITE_API_BASE_URL;
 
-  useEffect(() => {
-    const fetchLinkData = async () => {
-      try {
-        const response = await fetch(`${apiUrl}/short/${shortId}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-        if (!response.ok) {
-          if (response.status === 404) {
-            throw new Error('O link solicitado não está disponível ou não existe.');
-          } else if (response.status === 401) {
-            throw new Error('O link solicitado está protegido por senha.');  // TODO: Adicionar input por senha
+  const fetchLinkData = async (passwordHeader?: string) => {
+    try {
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (passwordHeader) {
+        headers['password'] = passwordHeader;
+      }
+
+      const response = await fetch(`${apiUrl}/short/${shortId}`, {
+        method: 'GET',
+        headers,
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error('O link solicitado não está disponível ou não existe.');
+        } else if (response.status === 401) {
+          const errorText = await response.text();
+          if (errorText.includes('password protected')) {
+            setIsPasswordProtected(true);
+            return null;
           } else {
-            throw new Error('Erro ao carregar o link');
+            throw new Error('Senha incorreta. Tente novamente.');
           }
+        } else {
+          throw new Error('Erro ao carregar o link');
         }
-        const data = await response.json();
-        setLinkData(data);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  useEffect(() => {
+    const loadLinkData = async () => {
+      try {
+        setIsLoading(true);
+        const data = await fetchLinkData();
+        if (data) {
+          setLinkData(data);
+          setIsPasswordProtected(false);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erro ao carregar o link');
       } finally {
@@ -44,8 +76,32 @@ const ConfirmationPage = () => {
       }
     };
 
-    fetchLinkData();
+    loadLinkData();
   }, [shortId]);
+
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!password.trim()) {
+      setPasswordError('Por favor, insira a senha');
+      return;
+    }
+
+    setIsValidatingPassword(true);
+    setPasswordError(null);
+
+    try {
+      const data = await fetchLinkData(password);
+      if (data) {
+        setLinkData(data);
+        setIsPasswordProtected(false);
+        setPassword('');
+      }
+    } catch (err) {
+      setPasswordError(err instanceof Error ? err.message : 'Erro ao validar senha');
+    } finally {
+      setIsValidatingPassword(false);
+    }
+  };
 
   const handleRedirect = async () => {
     if (!linkData?.original_url || !shortId) return;
@@ -91,6 +147,123 @@ const ConfirmationPage = () => {
     );
   }
 
+  // Password protected state
+  if (isPasswordProtected) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 dark:from-gray-900 dark:to-gray-800">
+        <Navbar />
+        
+        {/* Header Section */}
+        <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700">
+          <div className="container mx-auto px-4 py-4 sm:py-6">
+            <div className="text-center">
+              <div className="flex justify-center mb-3">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-amber-600 to-orange-600 rounded-full flex items-center justify-center shadow-lg">
+                  <Lock className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                </div>
+              </div>
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-1">
+                Link Protegido por Senha
+              </h1>
+              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300">
+                Este link requer uma senha para acesso
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="container mx-auto px-4 py-6 sm:py-8">
+          <div className="max-w-md mx-auto">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className="p-6 sm:p-8">
+                <div className="text-center mb-6">
+                  <div className="w-16 h-16 bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Lock className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-2">
+                    Acesso Restrito
+                  </h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    Para continuar, insira a senha do link abaixo
+                  </p>
+                </div>
+
+                <form onSubmit={handlePasswordSubmit} className="space-y-4">
+                  <div>
+                    <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
+                      Senha do Link
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        id="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full px-4 py-3 pr-12 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-sm"
+                        placeholder="Digite a senha..."
+                        disabled={isValidatingPassword}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                      >
+                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
+                    </div>
+                    {passwordError && (
+                      <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+                        {passwordError}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button
+                      type="button"
+                      onClick={handleCancel}
+                      className="w-full sm:w-auto px-6 py-3 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium rounded-lg transition-all duration-200 transform hover:scale-105 shadow-md hover:shadow-lg border border-gray-300 dark:border-gray-600 flex items-center justify-center text-sm"
+                    >
+                      <X className="w-4 h-4 mr-2" />
+                      Cancelar
+                    </button>
+                    
+                    <button
+                      type="submit"
+                      disabled={isValidatingPassword || !password.trim()}
+                      className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-medium rounded-lg transition-all duration-200 transform hover:scale-105 disabled:scale-100 shadow-md hover:shadow-lg disabled:shadow-sm flex items-center justify-center min-w-[120px] text-sm"
+                    >
+                      {isValidatingPassword ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Verificando...
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="w-4 h-4 mr-2" />
+                          Acessar
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+            
+            {/* Security Notice */}
+            <div className="mt-6 text-center px-4">
+              <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 max-w-xl mx-auto leading-relaxed">
+                🔒 Este link foi protegido pelo criador para garantir acesso apenas a pessoas autorizadas.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
   if (error || !linkData) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-100 dark:from-gray-900 dark:to-gray-800">

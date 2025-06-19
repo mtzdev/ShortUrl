@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header
 from src.db.models import Link
 from src.db.database import get_db
 from sqlalchemy.orm import Session
-from src.schemas import LinkCreateSchema, LinkCreateResponseSchema, LinkPublicSchema, LinkStatsSchema, UserLinksResponseSchema, LinkUpdateSchema
+from src.schemas import LinkCreateSchema, LinkCreateResponseSchema, LinkPublicSchema, LinkStatsSchema, UserLinksResponseSchema, LinkUpdateSchema, LinkPasswordUpdateSchema
 from src.utils import validate_short_url
 from src.security import generate_password_hash, verify_password, get_user
 
@@ -38,6 +38,9 @@ def create_url(url: LinkCreateSchema, user: dict = Depends(get_user), db: Sessio
     if not validated_short:
         raise HTTPException(status_code=400, detail="Invalid short URL")
 
+    if url.password and len(url.password.strip()) < 3:
+        raise HTTPException(status_code=400, detail="Password must be at least 3 characters long")
+
     url.short_url = validated_short
 
     if db.query(Link).filter(Link.short_url == url.short_url).first():
@@ -56,7 +59,7 @@ def create_url(url: LinkCreateSchema, user: dict = Depends(get_user), db: Sessio
     return link
 
 @router.get('/stats/{short_id}', response_model=LinkStatsSchema)
-def get_stats(short_id: str, db: Session = Depends(get_db)):  # TODO: Validar se o short_id é um link ou slug, se for link, obter apenas o slug
+def get_stats(short_id: str, db: Session = Depends(get_db)):
     link = db.query(Link).filter(Link.short_url == short_id).first()
     if not link:
         raise HTTPException(status_code=404, detail="Link not found")
@@ -72,6 +75,8 @@ def get_user_links(user: dict = Depends(get_user), db: Session = Depends(get_db)
         raise HTTPException(status_code=401, detail="You must be logged in to access this resource")
 
     links = db.query(Link).filter(Link.user_id == user['id']).all()
+    for link in links:
+        link.has_password = bool(link.password)
     return {'links': links}
 
 @router.patch('/short/{short_id}')
@@ -93,6 +98,22 @@ def update_short_url(short_id: str, new_url: LinkUpdateSchema, user: dict = Depe
     db.commit()
     db.refresh(link)
     return {'message': 'Short URL updated successfully', 'short_url': link.short_url}
+
+@router.patch('/short/{short_id}/password')
+def update_link_password(short_id: str, password: LinkPasswordUpdateSchema, user: dict = Depends(get_user), db: Session = Depends(get_db)):
+    if not user:
+        raise HTTPException(status_code=401, detail="You must be logged in to access this resource")
+
+    if len(password.password.strip()) < 3:
+        raise HTTPException(status_code=400, detail="Password must be at least 3 characters long")
+
+    link = db.query(Link).filter(Link.short_url == short_id, Link.user_id == user['id']).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Link not found")
+
+    link.password = generate_password_hash(password.password)
+    db.commit()
+    return {'message': 'Password updated successfully'}
 
 @router.delete('/short/{short_id}')
 def delete_short_url(short_id: str, user: dict = Depends(get_user), db: Session = Depends(get_db)):
