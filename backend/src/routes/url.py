@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, Request, Response
 from src.db.models import Link
 from src.db.database import get_db
 from sqlalchemy.orm import Session
@@ -33,7 +33,8 @@ def click_url(short_id: str, db: Session = Depends(get_db)):
     return {'message': 'Link clicked successfully'}
 
 @router.post('/short', response_model=LinkCreateResponseSchema)
-def create_url(url: LinkCreateSchema, user: dict = Depends(get_user), db: Session = Depends(get_db)):
+def create_url(url: LinkCreateSchema, request: Request, response: Response, db: Session = Depends(get_db)):
+    user = get_user(request, response, db)
     validated_short = validate_short_url(url.short_url, db)
     if not validated_short:
         raise HTTPException(status_code=400, detail="Invalid short URL")
@@ -70,7 +71,8 @@ def get_stats(short_id: str, db: Session = Depends(get_db)):
     return {'original_url': link.original_url, 'short_url': link.short_url, 'clicks': link.clicks, 'created_at': link.created_at}
 
 @router.get('/user/links', response_model=UserLinksResponseSchema)
-def get_user_links(user: dict = Depends(get_user), db: Session = Depends(get_db)):
+def get_user_links(request: Request, response: Response, db: Session = Depends(get_db)):
+    user = get_user(request, response, db)
     if not user:
         raise HTTPException(status_code=401, detail="You must be logged in to access this resource")
 
@@ -80,7 +82,8 @@ def get_user_links(user: dict = Depends(get_user), db: Session = Depends(get_db)
     return {'links': links}
 
 @router.patch('/short/{short_id}')
-def update_short_url(short_id: str, new_url: LinkUpdateSchema, user: dict = Depends(get_user), db: Session = Depends(get_db)):
+def update_short_url(short_id: str, new_url: LinkUpdateSchema, request: Request, response: Response, db: Session = Depends(get_db)):
+    user = get_user(request, response, db)
     if not user:
         raise HTTPException(status_code=401, detail="You must be logged in to access this resource")
 
@@ -100,7 +103,8 @@ def update_short_url(short_id: str, new_url: LinkUpdateSchema, user: dict = Depe
     return {'message': 'Short URL updated successfully', 'short_url': link.short_url}
 
 @router.patch('/short/{short_id}/password')
-def update_link_password(short_id: str, password: LinkPasswordUpdateSchema, user: dict = Depends(get_user), db: Session = Depends(get_db)):
+def update_link_password(short_id: str, password: LinkPasswordUpdateSchema, request: Request, response: Response, db: Session = Depends(get_db)):
+    user = get_user(request, response, db)
     if not user:
         raise HTTPException(status_code=401, detail="You must be logged in to access this resource")
 
@@ -116,7 +120,8 @@ def update_link_password(short_id: str, password: LinkPasswordUpdateSchema, user
     return {'message': 'Password updated successfully'}
 
 @router.delete('/short/{short_id}')
-def delete_short_url(short_id: str, user: dict = Depends(get_user), db: Session = Depends(get_db)):
+def delete_short_url(short_id: str, request: Request, response: Response, db: Session = Depends(get_db)):
+    user = get_user(request, response, db)
     if not user:
         raise HTTPException(status_code=401, detail="You must be logged in to access this resource")
 

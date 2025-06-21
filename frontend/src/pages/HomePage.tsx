@@ -22,9 +22,9 @@ const HomePage = () => {
       const response = await fetch(`${apiUrl}/short`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           original_url: url,
           short_url: useCustomSlug ? customSlug : undefined,

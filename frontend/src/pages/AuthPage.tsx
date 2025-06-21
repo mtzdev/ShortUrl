@@ -188,14 +188,13 @@ const AuthPage = () => {
     }
     
     try {
-      const response = await authService.register({
+      await authService.register({
         username,
         email: registerEmail,
         password: registerPassword,
         confirm_password: confirmPassword,
       });
       
-      localStorage.setItem('token', response.access_token);
       await login(registerEmail, registerPassword);
       navigate('/');
     } catch (error) {

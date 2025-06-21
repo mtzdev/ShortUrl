@@ -21,7 +21,6 @@ const Navbar = () => {
     navigate('/');
     setIsOpen(false);
     setUserDropdownOpen(false);
-    window.location.href = '/';
   };
 
   useEffect(() => {

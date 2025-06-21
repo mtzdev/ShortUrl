@@ -19,7 +19,7 @@ interface Link {
 }
 
 const ProfilePage = () => {
-  const { token } = useAuth();
+  const {} = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [links, setLinks] = useState<Link[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -119,17 +119,12 @@ const ProfilePage = () => {
   };
 
   const fetchProfile = async () => {
-    if (!token) {
-      setIsLoading(false);
-      return;
-    }
-
     try {
       const response = await fetch(`${apiUrl}/auth/me`, {
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
       });
       if (response.ok) {
         const data = await response.json();
@@ -141,14 +136,12 @@ const ProfilePage = () => {
   };
 
   const fetchUserLinks = async () => {
-    if (!token) return;
-
     try {
       const response = await fetch(`${apiUrl}/user/links`, {
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
       });
       if (response.ok) {
         const data = await response.json();
@@ -171,19 +164,19 @@ const ProfilePage = () => {
     };
 
     fetchData();
-  }, [token]);
+  }, []);
 
   const handleDeleteLink = async () => {
-    if (!selectedLink || !token) return;
+    if (!selectedLink) return;
 
     setIsSubmitting(true);
     try {
       const response = await fetch(`${apiUrl}/short/${selectedLink.short_url}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
       });
 
       if (response.ok) {
@@ -208,7 +201,7 @@ const ProfilePage = () => {
   };
 
   const handleEditLink = async () => {
-    if (!selectedLink || !token || !newSlug) return;
+    if (!selectedLink || !newSlug) return;
 
     if (!validateCustomSlug(newSlug)) {
       setPopupTitle('Link curto inválido!');
@@ -230,9 +223,9 @@ const ProfilePage = () => {
       const response = await fetch(`${apiUrl}/short/${selectedLink.short_url}`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           short_url: newSlug,
         }),
@@ -289,7 +282,7 @@ const ProfilePage = () => {
   };
 
   const handleUpdateLinkPassword = async () => {
-    if (!selectedLink || !token) return;
+    if (!selectedLink) return;
 
     if (!newLinkPassword.trim()) {
       setLinkPasswordError('A nova senha é obrigatória');
@@ -308,9 +301,9 @@ const ProfilePage = () => {
       const response = await fetch(`${apiUrl}/short/${selectedLink.short_url}/password`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           password: newLinkPassword,
         }),
@@ -371,9 +364,9 @@ const ProfilePage = () => {
       const response = await fetch(`${apiUrl}/short`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           original_url: createUrl,
           short_url: createUseCustomSlug ? createCustomSlug : undefined,
@@ -443,9 +436,9 @@ const ProfilePage = () => {
       const response = await fetch(`${apiUrl}/auth/me/username`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           username: newUsername,
         }),
@@ -522,9 +515,9 @@ const ProfilePage = () => {
       const response = await fetch(`${apiUrl}/auth/me/email`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           email: newEmail,
         }),
@@ -616,9 +609,9 @@ const ProfilePage = () => {
       const response = await fetch(`${apiUrl}/auth/me/password`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           password: newPassword,
         }),

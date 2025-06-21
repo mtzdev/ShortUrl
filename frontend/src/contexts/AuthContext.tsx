@@ -5,8 +5,7 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
-  token: string | null;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -14,21 +13,14 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const savedToken = localStorage.getItem('token');
-        if (savedToken) {
-          setToken(savedToken);
-          const userData = await authService.getCurrentUser(savedToken);
-          setUser(userData);
-        }
+        const userData = await authService.getCurrentUser();
+        setUser(userData);
       } catch (error) {
         console.error('Auth check failed:', error);
-        localStorage.removeItem('token');
-        setToken(null);
         setUser(null);
       } finally {
         setIsLoading(false);
@@ -40,27 +32,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string) => {
     try {
-      const response = await authService.login({ email, password });
-      const userToken = response.access_token;
-      
-      localStorage.setItem('token', userToken);
-      setToken(userToken);
-      
-      const userData = await authService.getCurrentUser(userToken);
+      await authService.login({ email, password });
+      const userData = await authService.getCurrentUser();
       setUser(userData);
     } catch (error) {
       throw error;
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    setToken(null);
-    setUser(null);
+  const logout = async () => {
+    try {
+      await authService.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setUser(null);
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, token }}>
+    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

@@ -30,6 +30,7 @@ export const authService = {
       headers: {
         'Content-Type': 'application/json',
       },
+      credentials: 'include',
       body: JSON.stringify(credentials),
     });
 
@@ -48,6 +49,7 @@ export const authService = {
       headers: {
         'Content-Type': 'application/json',
       },
+      credentials: 'include',
       body: JSON.stringify(userData),
     });
 
@@ -60,12 +62,12 @@ export const authService = {
     return data;
   },
 
-  async getCurrentUser(token: string): Promise<User> {
+  async getCurrentUser(): Promise<User> {
     const response = await fetch(`${API_BASE_URL}/auth/me`, {
       headers: {
-        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
+      credentials: 'include',
     });
 
     const data = await response.json();
@@ -75,5 +77,20 @@ export const authService = {
     }
 
     return data;
+  },
+
+  async logout(): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/auth/logout`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.detail || 'Erro no logout');
+    }
   },
 }; 

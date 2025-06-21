@@ -1,14 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.responses import JSONResponse
 from src.db.database import get_db
 from src.db.models import User
-from src.security import get_user, verify_password, generate_password_hash, generate_jwt_token
+from src.security import get_user, verify_password, generate_password_hash, generate_jwt_token, clear_auth_cookie
 from sqlalchemy.orm import Session
 from src.schemas import LoginRequestSchema, RegisterRequestSchema, LoginResponseSchema, UsernameUpdateSchema, EmailUpdateSchema, PasswordUpdateSchema
 
 router = APIRouter()
 
 @router.post('/login', response_model=LoginResponseSchema)
-def login(login: LoginRequestSchema, db: Session = Depends(get_db)):
+def login(login: LoginRequestSchema, response: Response, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == login.email).first()
     if not user:
         raise HTTPException(status_code=401, detail='E-mail ou senha estão inválidos. Por favor, tente novamente.')
@@ -16,10 +17,10 @@ def login(login: LoginRequestSchema, db: Session = Depends(get_db)):
     if not verify_password(login.password, user.password):
         raise HTTPException(status_code=401, detail='E-mail ou senha estão inválidos. Por favor, tente novamente.')
 
-    return generate_jwt_token(user.id, user.username)
+    return generate_jwt_token(user.id, user.username, response)
 
 @router.post('/register', response_model=LoginResponseSchema)
-def register(register: RegisterRequestSchema, db: Session = Depends(get_db)):
+def register(register: RegisterRequestSchema, response: Response, db: Session = Depends(get_db)):
     if register.password != register.confirm_password:
         raise HTTPException(status_code=400, detail='As senhas não coincidem. Verifique se as senhas estão iguais.')
 
@@ -35,17 +36,24 @@ def register(register: RegisterRequestSchema, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
 
-    return generate_jwt_token(user.id, user.username)
+    return generate_jwt_token(user.id, user.username, response)
+
+@router.post('/logout')
+def logout(response: Response):
+    clear_auth_cookie(response)
+    return {'message': 'Successfully logged out'}
 
 @router.get('/me')
-def get_current_user(request: Request, db: Session = Depends(get_db)):
-    user = get_user(request, db)
+def get_current_user(request: Request, response: Response, db: Session = Depends(get_db)):
+    user = get_user(request, response, db)
     if not user:
-        raise HTTPException(status_code=401, detail='Invalid token or user not found')
+        clear_auth_cookie(response)
+        return JSONResponse(status_code=401, content={'detail': 'Invalid token or user not found'}, headers=response.headers)
     return user
 
 @router.patch('/me/username')
-def update_username(new: UsernameUpdateSchema, user: dict = Depends(get_user), db: Session = Depends(get_db)):
+def update_username(new: UsernameUpdateSchema, request: Request, response: Response, db: Session = Depends(get_db)):
+    user = get_user(request, response, db)
     if not user:
         raise HTTPException(status_code=401, detail='Invalid token or user not found')
 
@@ -58,7 +66,8 @@ def update_username(new: UsernameUpdateSchema, user: dict = Depends(get_user), d
     return {'message': 'Username updated successfully'}
 
 @router.patch('/me/email')
-def update_email(new: EmailUpdateSchema, user: dict = Depends(get_user), db: Session = Depends(get_db)):
+def update_email(new: EmailUpdateSchema, request: Request, response: Response, db: Session = Depends(get_db)):
+    user = get_user(request, response, db)
     if not user:
         raise HTTPException(status_code=401, detail='Invalid token or user not found')
 
@@ -71,14 +80,12 @@ def update_email(new: EmailUpdateSchema, user: dict = Depends(get_user), db: Ses
     return {'message': 'E-mail updated successfully'}
 
 @router.patch('/me/password')
-def update_password(new: PasswordUpdateSchema, user: dict = Depends(get_user), db: Session = Depends(get_db)):
+def update_password(new: PasswordUpdateSchema, request: Request, response: Response, db: Session = Depends(get_db)):
+    user = get_user(request, response, db)
     if not user:
         raise HTTPException(status_code=401, detail='Invalid token or user not found')
 
     user_db = db.query(User).filter(User.id == user['id']).first()
-    if not user_db:
-        raise HTTPException(status_code=401, detail='Invalid token or user not found')
-
     if verify_password(new.password, user_db.password):
         raise HTTPException(status_code=401, detail='The new password cannot be the same as the old password')
 
