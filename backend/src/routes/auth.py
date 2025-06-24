@@ -17,7 +17,7 @@ def login(login: LoginRequestSchema, response: Response, db: Session = Depends(g
     if not verify_password(login.password, user.password):
         raise HTTPException(status_code=401, detail='E-mail ou senha estão inválidos. Por favor, tente novamente.')
 
-    return generate_jwt_token(user.id, user.username, response)
+    return generate_jwt_token(user.id, user.username, response, login.remember)
 
 @router.post('/register', response_model=LoginResponseSchema)
 def register(register: RegisterRequestSchema, response: Response, db: Session = Depends(get_db)):

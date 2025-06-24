@@ -30,6 +30,7 @@ class LinkStatsSchema(BaseModel):
 class LoginRequestSchema(BaseModel):
     email: EmailStr
     password: str
+    remember: bool = Field(default=False)
 
     @field_validator('email')
     @classmethod

@@ -64,6 +64,7 @@ const AuthPage = () => {
 
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
 
   const [username, setUsername] = useState('');
   const [registerEmail, setRegisterEmail] = useState('');
@@ -153,7 +154,7 @@ const AuthPage = () => {
     }
     
     try {
-      await login(loginEmail, loginPassword);
+      await login(loginEmail, loginPassword, rememberMe);
       navigate('/');
     } catch (error) {
       if (error instanceof Error) {
@@ -212,6 +213,7 @@ const AuthPage = () => {
     setFormType(formType === 'login' ? 'register' : 'login');
     setError('');
     setValidationErrors({});
+    setRememberMe(false);
   };
 
   const renderInputError = (field: keyof ValidationErrors) => {
@@ -314,6 +316,8 @@ const AuthPage = () => {
                     id="remember-me"
                     name="remember-me"
                     type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded transition-colors"
                   />
                   <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
