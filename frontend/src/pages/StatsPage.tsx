@@ -81,14 +81,14 @@ const StatsPage = () => {
             <input
               type="text"
               placeholder={`${baseUrl.replace('https://', '')}/`}
-              className="block w-full pl-10 pr-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              className="block w-full pl-10 pr-3 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
               value={slug}
               onChange={(e) => setSlug(e.target.value)}
             />
           </div>
           <button
             type="submit"
-            className="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+            className="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-xl text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-sm"
             disabled={isLoading || !slug}
           >
             {isLoading ? (
@@ -108,7 +108,7 @@ const StatsPage = () => {
         {hasSearched && (
           <div className="mt-8 animate-fadeIn">
             {stats ? (
-              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 transition-all duration-300">
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-6 transition-all duration-300">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
                   Informações do Link
                 </h2>
@@ -142,7 +142,7 @@ const StatsPage = () => {
                         </a>
                         <button
                           onClick={() => navigator.clipboard.writeText(`${baseUrl}/${stats.short_url}`)}
-                          className="ml-2 p-1 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
+                          className="ml-2 p-1 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-all duration-200 hover:scale-110 rounded"
                           title="Copiar link"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -198,7 +198,7 @@ const StatsPage = () => {
         )}
       </div>
 
-      <div className="mt-10 bg-blue-50 dark:bg-blue-900/20 rounded-lg p-6 shadow-sm">
+      <div className="mt-10 bg-blue-50 dark:bg-blue-900/20 rounded-xl p-6 shadow-sm">
         <h2 className="text-lg font-medium text-blue-800 dark:text-blue-300 mb-2">
           Dica Profissional
         </h2>
