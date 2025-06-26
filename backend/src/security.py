@@ -39,8 +39,8 @@ def generate_jwt_token(user_id: int, username: str, response: Response, remember
         value=jwt,
         max_age=JWT_EXPIRATION_TIME * 60,
         httponly=True,
-        secure=False,  # TODO: Mudar True em produção
-        samesite='lax'
+        secure=True,
+        samesite='none'
     )
 
     response.set_cookie(
@@ -48,8 +48,8 @@ def generate_jwt_token(user_id: int, username: str, response: Response, remember
         value=refresh_token,
         max_age=60 * 60 * 24 * 30 if remember else None,
         httponly=True,
-        secure=False,  # TODO: Mudar True em produção
-        samesite='lax'
+        secure=True,
+        samesite='none'
     )
     return {'access_token': jwt, 'refresh_token': refresh_token, 'token_type': 'Bearer'}
 
@@ -107,8 +107,8 @@ def clear_auth_cookie(response: Response):
         max_age=0,
         expires=0,
         httponly=True,
-        secure=False,  # TODO: Mudar True em produção
-        samesite='lax'
+        secure=True,
+        samesite='none'
     )
 
     response.set_cookie(
@@ -117,6 +117,6 @@ def clear_auth_cookie(response: Response):
         max_age=0,
         expires=0,
         httponly=True,
-        secure=False,  # TODO: Mudar True em produção
-        samesite='lax'
+        secure=True,
+        samesite='none'
     )

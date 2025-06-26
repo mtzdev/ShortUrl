@@ -1,5 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { SpeedInsights } from '@vercel/speed-insights/react';
+import { Analytics } from '@vercel/analytics/react';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
 import Layout from './components/Layout';
@@ -33,6 +35,8 @@ function App() {
             </Route>
           </Routes>
         </Router>
+        <SpeedInsights />
+        <Analytics />
       </AuthProvider>
     </ThemeProvider>
   );
