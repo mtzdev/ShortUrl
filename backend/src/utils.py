@@ -1,7 +1,17 @@
 import re
 import string
 from random import choices
+from fastapi import Request
 from src.db.models import Link
+from slowapi import Limiter
+
+def get_user_ip(request: Request) -> str | None:
+    forwarded_for = request.headers.get('X-Forwarded-For')
+    if forwarded_for:
+        return forwarded_for.split(',')[0].strip()
+    return request.headers.get('cf-connecting-ip')
+
+limiter = Limiter(key_func=get_user_ip)
 
 def validate_short_url(short_url: str | None, db = None, auto_generate = True):
     if not short_url or short_url.strip() == "":

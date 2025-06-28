@@ -3,13 +3,15 @@ from fastapi.responses import JSONResponse
 from src.db.database import get_db
 from src.db.models import User
 from src.security import get_user, verify_password, generate_password_hash, generate_jwt_token, clear_auth_cookie
-from sqlalchemy.orm import Session
 from src.schemas import LoginRequestSchema, RegisterRequestSchema, LoginResponseSchema, UsernameUpdateSchema, EmailUpdateSchema, PasswordUpdateSchema
+from src.utils import limiter
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
 @router.post('/login', response_model=LoginResponseSchema)
-def login(login: LoginRequestSchema, response: Response, db: Session = Depends(get_db)):
+@limiter.limit("5/minute;25/day")
+def login(login: LoginRequestSchema, request: Request, response: Response, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == login.email).first()
     if not user:
         raise HTTPException(status_code=401, detail='E-mail ou senha estão inválidos. Por favor, tente novamente.')
@@ -20,7 +22,8 @@ def login(login: LoginRequestSchema, response: Response, db: Session = Depends(g
     return generate_jwt_token(user.id, user.username, response, login.remember)
 
 @router.post('/register', response_model=LoginResponseSchema)
-def register(register: RegisterRequestSchema, response: Response, db: Session = Depends(get_db)):
+@limiter.limit("3/minute;15/day")
+def register(register: RegisterRequestSchema, request: Request, response: Response, db: Session = Depends(get_db)):
     if register.password != register.confirm_password:
         raise HTTPException(status_code=400, detail='As senhas não coincidem. Verifique se as senhas estão iguais.')
 
@@ -52,6 +55,7 @@ def get_current_user(request: Request, response: Response, db: Session = Depends
     return user
 
 @router.patch('/me/username')
+@limiter.limit("5/day")
 def update_username(new: UsernameUpdateSchema, request: Request, response: Response, db: Session = Depends(get_db)):
     user = get_user(request, response, db)
     if not user:
@@ -66,6 +70,7 @@ def update_username(new: UsernameUpdateSchema, request: Request, response: Respo
     return {'message': 'Username updated successfully'}
 
 @router.patch('/me/email')
+@limiter.limit("3/day")
 def update_email(new: EmailUpdateSchema, request: Request, response: Response, db: Session = Depends(get_db)):
     user = get_user(request, response, db)
     if not user:
@@ -80,6 +85,7 @@ def update_email(new: EmailUpdateSchema, request: Request, response: Response, d
     return {'message': 'E-mail updated successfully'}
 
 @router.patch('/me/password')
+@limiter.limit("3/day")
 def update_password(new: PasswordUpdateSchema, request: Request, response: Response, db: Session = Depends(get_db)):
     user = get_user(request, response, db)
     if not user:

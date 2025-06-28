@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Search, ExternalLink, Calendar, BarChart2 } from 'lucide-react';
+import Popup from '../components/Popup';
 
 interface LinkStats {
   original_url: string;
@@ -13,6 +14,7 @@ const StatsPage = () => {
   const [stats, setStats] = useState<LinkStats | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [showRateLimitPopup, setShowRateLimitPopup] = useState(false);
   const apiUrl = import.meta.env.VITE_API_BASE_URL;
   const baseUrl = import.meta.env.VITE_BASE_URL;
 
@@ -50,6 +52,10 @@ const StatsPage = () => {
       });
 
       if (!response.ok) {
+        if (response.status === 429) {
+          setShowRateLimitPopup(true);
+          return;
+        }
         throw new Error('Failed to fetch link stats');
       }
 
@@ -208,6 +214,14 @@ const StatsPage = () => {
           Já possui uma conta? <a href="/perfil" className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"><b>Acesse seu painel</b></a> e visualize todas as suas estatísticas em um só lugar.
         </p>
       </div>
+
+      {showRateLimitPopup && (
+        <Popup
+          title="Limite de Requisições Atingido"
+          description="Você atingiu o limite de requisições. Por favor, tente novamente mais tarde."
+          onClose={() => setShowRateLimitPopup(false)}
+        />
+      )}
     </div>
   );
 };

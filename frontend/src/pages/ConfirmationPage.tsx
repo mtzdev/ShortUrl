@@ -48,6 +48,8 @@ const ConfirmationPage = () => {
           } else {
             throw new Error('Senha incorreta. Tente novamente.');
           }
+        } else if (response.status === 429) {
+          throw new Error('Você atingiu o limite de requisições. Por favor, tente novamente mais tarde.');
         } else {
           throw new Error('Erro ao carregar o link');
         }
