@@ -51,7 +51,7 @@ def generate_jwt_token(user_id: int, username: str, session_id: str,
         secure=True,
         samesite='none'
     )
-    return {'access_token': jwt, 'refresh_token': refresh_token, 'token_type': 'Bearer'}
+    return {'access_token': jwt, 'refresh_token': refresh_token}
 
 def generate_refresh_token(user_id: int, session_id: str, request: Request, remember: bool, db: Session):
     token = hashlib.sha256(secrets.token_urlsafe(32).encode()).hexdigest()

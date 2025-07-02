@@ -1,4 +1,5 @@
 from pytest import fixture
+from fastapi import Response, Request
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
@@ -7,7 +8,8 @@ from src.app import app
 from src.db.models import table_registry
 from src.db.database import get_db
 from src.db.models import Link, User
-from src.security import generate_password_hash, generate_jwt_token
+from src.security import generate_password_hash, generate_jwt_token, generate_session_id
+from unittest.mock import MagicMock
 
 @fixture()
 def client(db_session: Session):
@@ -19,6 +21,22 @@ def client(db_session: Session):
         yield client
 
     app.dependency_overrides.clear()
+
+@fixture()
+def client_with_invalid_user(client):
+    client.cookies.update({
+        'access_token': 'invalid_token',
+        'session_id': 'invalid_session_id'
+    })
+    return client
+
+@fixture()
+def logged_client(client, user):
+    client.cookies.update({
+        'access_token': user.token_jwt,
+        'session_id': user.session_id
+    })
+    return client
 
 @fixture()
 def db_session():
@@ -62,7 +80,7 @@ def url_with_user(db_session: Session, user: User):
     return url
 
 @fixture()
-def user(db_session: Session):
+def user(db_session: Session, request_mock: Request):
     clean_password = 'password123'
     user = User(username='User', email='user@test.com', password=generate_password_hash(clean_password))
 
@@ -70,8 +88,20 @@ def user(db_session: Session):
     db_session.commit()
     db_session.refresh(user)
 
-    jwt = generate_jwt_token(user.id, user.username)
+    user.session_id = generate_session_id(Response())
+    jwt = generate_jwt_token(user.id, user.username, user.session_id, request_mock, Response(), False, db_session)
 
     user.clean_password = clean_password
     user.token_jwt = jwt['access_token']
+    user.token_refresh = jwt['refresh_token']
     return user
+
+@fixture()
+def request_mock():
+    mock_request = MagicMock(spec=Request)
+    mock_request.cookies = {}
+    mock_request.headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36', 'X-Forwarded-For': '127.0.0.1'}
+    mock_request.url = "http://localhost:5173/"
+
+    return mock_request
+

@@ -20,12 +20,12 @@ def test_login_validator_email_invalid(client):
     assert response.status_code == 422
     assert response.json()['detail'][0]['msg'] == 'Value error, O e-mail inserido não é válido. Verifique se o e-mail está correto e tente novamente.'
 
-def test_login_success(client, user):
-    response = client.post('/api/auth/login', json={'email': user.email, 'password': user.clean_password})
+def test_login_success(client, user, request_mock):
+    response = client.post('/api/auth/login', json={'email': user.email, 'password': user.clean_password}, headers=request_mock.headers)
 
     assert response.status_code == 200
     assert 'access_token' in response.json()
-    assert 'token_type' in response.json()
+    assert 'refresh_token' in response.json()
 
 def test_register_with_password_mismatch(client):
     response = client.post('/api/auth/register', json={
@@ -96,40 +96,40 @@ def test_register_validator_password_invalid(client):
         assert response.status_code == 422
         assert response.json()['detail'][0]['msg'] == 'Value error, A senha deve conter no mínimo 8 caracteres, incluindo pelo menos uma letra e um número.'
 
-def test_register_success(client):
-    response = client.post('/api/auth/register', json={'username': 'user', 'email': 'user@test.com', 'password': 'password1', 'confirm_password': 'password1'})
+def test_register_success(client, request_mock):
+    response = client.post('/api/auth/register', json={'username': 'user', 'email': 'user@test.com', 'password': 'password1', 'confirm_password': 'password1'}, headers=request_mock.headers)
 
     assert response.status_code == 200
     assert response.json()
     assert 'access_token' in response.json()
-    assert 'token_type' in response.json()
+    assert 'refresh_token' in response.json()
 
-def test_get_current_user_error(client):
-    response = client.get('/api/auth/me', headers={'Authorization': 'Bearer invalid_token'})
+def test_get_current_user_error(client_with_invalid_user):
+    response = client_with_invalid_user.get('/api/auth/me')
 
     assert response.status_code == 401
     assert response.json()['detail'] == 'Invalid token or user not found'
 
-def test_get_current_user_success(client, user):
-    response = client.get('/api/auth/me', headers={'Authorization': f'Bearer {user.token_jwt}'})
+def test_get_current_user_success(logged_client, user):
+    response = logged_client.get('/api/auth/me')
 
     assert response.status_code == 200
     assert response.json() == {'id': user.id, 'username': user.username, 'email': user.email}
 
-def test_update_username_with_invalid_user(client):
-    response = client.patch('/api/auth/me/username', json={'username': 'new_username'}, headers={'Authorization': 'Bearer invalid_token'})
+def test_update_username_with_invalid_user(client_with_invalid_user):
+    response = client_with_invalid_user.patch('/api/auth/me/username', json={'username': 'new_username'})
 
     assert response.status_code == 401
     assert response.json()['detail'] == 'Invalid token or user not found'
 
-def test_update_username_with_duplicate_username(client, user):
-    response = client.patch('/api/auth/me/username', json={'username': user.username}, headers={'Authorization': f'Bearer {user.token_jwt}'})
+def test_update_username_with_duplicate_username(logged_client, user):
+    response = logged_client.patch('/api/auth/me/username', json={'username': user.username})
 
     assert response.status_code == 409
     assert response.json()['detail'] == 'Username already registered. Please try another username.'
 
-def test_update_username_success(client, user, db_session):
-    response = client.patch('/api/auth/me/username', json={'username': 'new_username'}, headers={'Authorization': f'Bearer {user.token_jwt}'})
+def test_update_username_success(logged_client, user, db_session):
+    response = logged_client.patch('/api/auth/me/username', json={'username': 'new_username'})
 
     assert response.status_code == 200
     assert response.json() == {'message': 'Username updated successfully'}
@@ -137,20 +137,20 @@ def test_update_username_success(client, user, db_session):
     user_db = db_session.query(User).filter(User.id == user.id).first()
     assert user_db.username == 'new_username'
 
-def test_update_email_with_invalid_user(client):
-    response = client.patch('/api/auth/me/email', json={'email': 'new@email.com'}, headers={'Authorization': 'Bearer invalid_token'})
+def test_update_email_with_invalid_user(client_with_invalid_user):
+    response = client_with_invalid_user.patch('/api/auth/me/email', json={'email': 'new@email.com'})
 
     assert response.status_code == 401
     assert response.json()['detail'] == 'Invalid token or user not found'
 
-def test_update_email_with_duplicate_email(client, user):
-    response = client.patch('/api/auth/me/email', json={'email': user.email}, headers={'Authorization': f'Bearer {user.token_jwt}'})
+def test_update_email_with_duplicate_email(logged_client, user):
+    response = logged_client.patch('/api/auth/me/email', json={'email': user.email})
 
     assert response.status_code == 409
     assert response.json()['detail'] == 'E-mail already registered. Please try another e-mail'
 
-def test_update_email_success(client, user, db_session):
-    response = client.patch('/api/auth/me/email', json={'email': 'new@email.com'}, headers={'Authorization': f'Bearer {user.token_jwt}'})
+def test_update_email_success(logged_client, user, db_session):
+    response = logged_client.patch('/api/auth/me/email', json={'email': 'new@email.com'})
 
     assert response.status_code == 200
     assert response.json() == {'message': 'E-mail updated successfully'}
@@ -158,20 +158,20 @@ def test_update_email_success(client, user, db_session):
     user_db = db_session.query(User).filter(User.id == user.id).first()
     assert user_db.email == 'new@email.com'
 
-def test_update_password_with_invalid_user(client):
-    response = client.patch('/api/auth/me/password', json={'password': 'newpassword1'}, headers={'Authorization': 'Bearer invalid_token'})
+def test_update_password_with_invalid_user(client_with_invalid_user):
+    response = client_with_invalid_user.patch('/api/auth/me/password', json={'password': 'newpassword1'})
 
     assert response.status_code == 401
     assert response.json()['detail'] == 'Invalid token or user not found'
 
-def test_update_password_with_same_password(client, user):
-    response = client.patch('/api/auth/me/password', json={'password': user.clean_password}, headers={'Authorization': f'Bearer {user.token_jwt}'})
+def test_update_password_with_same_password(logged_client, user):
+    response = logged_client.patch('/api/auth/me/password', json={'password': user.clean_password})
 
     assert response.status_code == 401
     assert response.json()['detail'] == 'The new password cannot be the same as the old password'
 
-def test_update_password_success(client, user):
-    response = client.patch('/api/auth/me/password', json={'password': 'newpassword1'}, headers={'Authorization': f'Bearer {user.token_jwt}'})
+def test_update_password_success(logged_client):
+    response = logged_client.patch('/api/auth/me/password', json={'password': 'newpassword1'})
 
     assert response.status_code == 200
     assert response.json() == {'message': 'Password updated successfully'}

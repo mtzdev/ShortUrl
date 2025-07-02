@@ -24,7 +24,6 @@ def login(login: LoginRequestSchema, request: Request, response: Response, db: S
     return {
         'access_token': token['access_token'],
         'refresh_token': token['refresh_token'],
-        'token_type': token['token_type'],
         'user': {
             'id': user.id,
             'username': user.username,
@@ -54,7 +53,6 @@ def register(register: RegisterRequestSchema, request: Request, response: Respon
     return {
         'access_token': token['access_token'],
         'refresh_token': token['refresh_token'],
-        'token_type': token['token_type'],
         'user': {
             'id': user.id,
             'username': user.username,
