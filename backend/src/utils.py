@@ -11,6 +11,9 @@ def get_user_ip(request: Request) -> str | None:
         return forwarded_for.split(',')[0].strip()
     return request.headers.get('cf-connecting-ip')
 
+def get_user_agent(request: Request) -> str:
+    return request.headers.get('User-Agent', 'Unknown')
+
 limiter = Limiter(key_func=get_user_ip)
 
 def validate_short_url(short_url: str | None, db = None, auto_generate = True):
@@ -19,6 +22,10 @@ def validate_short_url(short_url: str | None, db = None, auto_generate = True):
             return generate_short_url(db)
         else:
             return False
+
+    blacklist = ['links', 'auth', 'perfil', 'api', 'admin']
+    if short_url in blacklist:
+        return False
 
     if not re.fullmatch(r"^[a-zA-Z0-9_-]{3,16}$", short_url):
         return False

@@ -32,9 +32,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string, remember?: boolean) => {
     try {
-      await authService.login({ email, password, remember });
-      const userData = await authService.getCurrentUser();
-      setUser(userData);
+      const response = await authService.login({ email, password, remember });
+      if (response.user) {
+        setUser(response.user);
+      } else {
+        const userData = await authService.getCurrentUser();
+        setUser(userData);
+      }
     } catch (error) {
       throw error;
     }
