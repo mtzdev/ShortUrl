@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, X, Edit3, Trash2, Eye, EyeOff, Lock } from 'lucide-react';
+import { User, X, Edit3, Trash2, Eye, EyeOff, Lock, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Popup from '../components/Popup';
 import { validateUsername, validateEmail, validatePassword, validateConfirmPassword } from './AuthPage';
@@ -16,6 +16,7 @@ interface Link {
   clicks: number;
   created_at: string;
   has_password: boolean;
+  expires_at: string | null;
 }
 
 const ProfilePage = () => {
@@ -23,7 +24,7 @@ const ProfilePage = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [links, setLinks] = useState<Link[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [modalType, setModalType] = useState<'username' | 'email' | 'password' | 'delete' | 'edit' | 'create' | 'password-info' | null>(null);
+  const [modalType, setModalType] = useState<'username' | 'email' | 'password' | 'delete' | 'edit' | 'create' | 'password-info' | 'expiration-info' | null>(null);
   
   // Form states
   const [newUsername, setNewUsername] = useState('');
@@ -45,6 +46,8 @@ const ProfilePage = () => {
   const [createCustomSlug, setCreateCustomSlug] = useState('');
   const [createUsePassword, setCreateUsePassword] = useState(false);
   const [createPassword, setCreatePassword] = useState('');
+  const [createUseExpiration, setCreateUseExpiration] = useState(false);
+  const [createExpirationDate, setCreateExpirationDate] = useState('');
   
   // Validation error states
   const [urlError, setUrlError] = useState('');
@@ -61,6 +64,10 @@ const ProfilePage = () => {
   const [newLinkPassword, setNewLinkPassword] = useState('');
   const [showLinkPassword, setShowLinkPassword] = useState(false);
   const [linkPasswordError, setLinkPasswordError] = useState('');
+  
+  // Expiration update states
+  const [newLinkExpiration, setNewLinkExpiration] = useState('');
+  const [linkExpirationError, setLinkExpirationError] = useState('');
   
   const apiUrl = import.meta.env.VITE_API_BASE_URL;
   const baseUrl = import.meta.env.VITE_BASE_URL;
@@ -79,6 +86,63 @@ const ProfilePage = () => {
         minute: '2-digit'
       })
     };
+  };
+
+  const formatDateTimeLocal = (dateString: string | null) => {
+    if (!dateString) return '';
+    const date = new Date(dateString + (dateString.includes('Z') ? '' : 'Z'));
+    
+    // Converter para o fuso local do usuário
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  const formatExpirationDate = (dateString: string) => {
+    const date = new Date(dateString + (dateString.includes('Z') ? '' : 'Z'));
+    return {
+      date: date.toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      }),
+      time: date.toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    };
+  };
+
+  const getMinDateTime = () => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() + 5); // Mínimo 5 minutos no futuro
+    return now.toISOString().slice(0, 16);
+  };
+
+  const getMaxDateTime = () => {
+    return '2999-12-31T23:59';
+  };
+
+  const handleDateTimeChange = (dateValue: string, setter: (value: string) => void) => {
+    if (dateValue) {
+      try {
+        const selectedDate = new Date(dateValue);
+        
+        if (selectedDate.getFullYear() > 2999) {
+          return;
+        }
+        
+        setter(dateValue);
+      } catch (error) {
+        setter(dateValue);
+      }
+    } else {
+      setter(dateValue);
+    }
   };
 
   const validateCustomSlug = (slug: string): boolean => {
@@ -114,6 +178,36 @@ const ProfilePage = () => {
     }
     if (password.length < 3) {
       return 'Senha deve ter pelo menos 3 caracteres';
+    }
+    return '';
+  };
+
+  const validateCreateExpiration = (expirationDate: string): string => {
+    if (!expirationDate.trim()) {
+      return 'É necessário selecionar uma data de expiração';
+    }
+    
+    const selectedDate = new Date(expirationDate);
+    const now = new Date();
+    
+    // Verificar se a data é válida
+    if (isNaN(selectedDate.getTime())) {
+      return 'Data de expiração inválida';
+    }
+    
+    // Verificar se o ano é menor que o atual
+    if (selectedDate.getFullYear() < now.getFullYear()) {
+      return 'Ano da data de expiração não pode ser menor que o ano atual';
+    }
+    
+    // Verificar se o ano é maior que 2999
+    if (selectedDate.getFullYear() > 2999) {
+      return 'Ano da data de expiração não pode ser maior que 2999';
+    }
+    
+    now.setMinutes(now.getMinutes() + 5);
+    if (selectedDate <= now) {
+      return 'Data de expiração deve ser pelo menos 5 minutos no futuro';
     }
     return '';
   };
@@ -281,6 +375,13 @@ const ProfilePage = () => {
     setModalType('password-info');
   };
 
+  const openExpirationInfoModal = (link: Link) => {
+    setSelectedLink(link);
+    setNewLinkExpiration(formatDateTimeLocal(link.expires_at));
+    setLinkExpirationError('');
+    setModalType('expiration-info');
+  };
+
   const handleUpdateLinkPassword = async () => {
     if (!selectedLink) return;
 
@@ -328,6 +429,99 @@ const ProfilePage = () => {
     }
   };
 
+  const handleUpdateLinkExpiration = async () => {
+    if (!selectedLink) return;
+
+    // Validar se a data foi alterada
+    const currentExpiration = formatDateTimeLocal(selectedLink.expires_at);
+    if (newLinkExpiration.trim() === currentExpiration.trim()) {
+      setLinkExpirationError('A data de expiração não foi alterada');
+      return;
+    }
+
+    // Validar se a data é válida (quando não está sendo removida)
+    if (newLinkExpiration) {
+      const validationError = validateCreateExpiration(newLinkExpiration);
+      if (validationError) {
+        setLinkExpirationError(validationError);
+        return;
+      }
+    }
+
+    setIsSubmitting(true);
+    setLinkExpirationError('');
+
+    try {
+      const response = await fetch(`${apiUrl}/short/${selectedLink.short_url}/expiration`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          expires_at: newLinkExpiration ? new Date(newLinkExpiration).toISOString() : null,
+        }),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        await fetchUserLinks(); // Refresh the links list
+        closeModal();
+        setPopupTitle('Data de expiração atualizada!');
+        setPopupDescription(
+          newLinkExpiration 
+            ? 'A data de expiração do link foi alterada com sucesso.'
+            : 'A data de expiração foi removida do link.'
+        );
+        setShowPopup(true);
+      } else if (data.detail === 'Expiration date must be at least 5 minutes in the future') {
+        setLinkExpirationError('A data de expiração deve ser pelo menos 5 minutos no futuro');
+      } else if (data.detail === 'Invalid expiration date') {
+        setLinkExpirationError('A data de expiração não é válida');
+      } else {
+        setLinkExpirationError('Não foi possível atualizar a data de expiração. Tente novamente.');
+      }
+    } catch (error) {
+      setLinkExpirationError('Ocorreu um erro inesperado. Tente novamente.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRemoveLinkExpiration = async () => {
+    if (!selectedLink) return;
+
+    setIsSubmitting(true);
+    setLinkExpirationError('');
+
+    try {
+      const response = await fetch(`${apiUrl}/short/${selectedLink.short_url}/expiration`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          expires_at: null,
+        }),
+      });
+
+      if (response.ok) {
+        await fetchUserLinks(); // Refresh the links list
+        closeModal();
+        setPopupTitle('Data de expiração removida!');
+        setPopupDescription('A data de expiração foi removida do link com sucesso.');
+        setShowPopup(true);
+      } else {
+        setLinkExpirationError('Não foi possível remover a data de expiração. Tente novamente.');
+      }
+    } catch (error) {
+      setLinkExpirationError('Ocorreu um erro inesperado. Tente novamente.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleCreateLink = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -359,6 +553,17 @@ const ProfilePage = () => {
       }
     }
 
+    let expirationValidationError = '';
+    if (createUseExpiration) {
+      expirationValidationError = validateCreateExpiration(createExpirationDate);
+      if (expirationValidationError) {
+        setPopupTitle('Data de expiração inválida');
+        setPopupDescription(expirationValidationError);
+        setShowPopup(true);
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     try {
       const response = await fetch(`${apiUrl}/short`, {
@@ -371,6 +576,7 @@ const ProfilePage = () => {
           original_url: createUrl,
           short_url: createUseCustomSlug ? createCustomSlug : undefined,
           password: createUsePassword ? createPassword : undefined,
+          expires_at: createUseExpiration ? new Date(createExpirationDate).toISOString() : undefined,
         }),
       });
 
@@ -386,6 +592,14 @@ const ProfilePage = () => {
           setCustomSlugError('Use de 3 a 16 caracteres, apenas letras, números e hífens');
         } else if (data.detail === 'Short URL already exists') {
           setCustomSlugError('Este link já está em uso. Escolha outro');
+        } else if (data.detail === 'Expiration date must be at least 5 minutes in the future') {
+          setPopupTitle('Data de expiração inválida');
+          setPopupDescription('A data de expiração deve ser no mínimo 5 minutos no futuro.');
+          setShowPopup(true);
+        } else if (data.detail === 'Invalid expiration date') {
+          setPopupTitle('Data de expiração inválida');
+          setPopupDescription('A data de expiração não é válida.');
+          setShowPopup(true);
         } else {
           setPopupTitle('Erro ao criar link');
           setPopupDescription(data.detail || 'Não foi possível criar o link. Tente novamente.');
@@ -660,6 +874,8 @@ const ProfilePage = () => {
     setNewLinkPassword('');
     setLinkPasswordError('');
     setShowLinkPassword(false);
+    setNewLinkExpiration('');
+    setLinkExpirationError('');
     resetFormStates();
     resetCreateFormStates();
   };
@@ -680,6 +896,8 @@ const ProfilePage = () => {
     setCreateCustomSlug('');
     setCreateUsePassword(false);
     setCreatePassword('');
+    setCreateUseExpiration(false);
+    setCreateExpirationDate('');
     setUrlError('');
     setCustomSlugError('');
     setPasswordError('');
@@ -796,15 +1014,26 @@ const ProfilePage = () => {
                               {link.original_url.length > 45 ? `${link.original_url.substring(0, 45)}...` : link.original_url}
                             </div>
                           </div>
-                          {link.has_password && (
-                            <button
-                              onClick={() => openPasswordInfoModal(link)}
-                              className="flex-shrink-0 ml-2 p-2 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/10 rounded-lg transition-all duration-200 hover:scale-110"
-                              title="Link protegido por senha - Clique para gerenciar"
-                            >
-                              <Lock className="w-4 h-4" />
-                            </button>
-                          )}
+                          <div className="flex items-center space-x-1 ml-2">
+                            {link.has_password && (
+                              <button
+                                onClick={() => openPasswordInfoModal(link)}
+                                className="flex-shrink-0 p-2 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/10 rounded-lg transition-all duration-200 hover:scale-110"
+                                title="Link protegido por senha - Clique para gerenciar"
+                              >
+                                <Lock className="w-4 h-4" />
+                              </button>
+                            )}
+                            {link.expires_at && (
+                              <button
+                                onClick={() => openExpirationInfoModal(link)}
+                                className="flex-shrink-0 p-2 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/10 rounded-lg transition-all duration-200 hover:scale-110"
+                                title={`Link expira em ${formatExpirationDate(link.expires_at).date} às ${formatExpirationDate(link.expires_at).time} - Clique para gerenciar`}
+                              >
+                                <Clock className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -918,11 +1147,31 @@ const ProfilePage = () => {
                                             <tr key={link.id} className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-25 dark:bg-gray-825'}`}>
                         <td className="px-4 py-4">
                           <div className="group relative">
-                            <div
-                              className="truncate cursor-help text-sm text-gray-900 dark:text-white font-medium"
-                              title="Clique para ver URL completa"
-                            >
-                              {link.original_url}
+                            <div className="flex items-center space-x-2">
+                              {link.has_password && (
+                                <button
+                                  onClick={() => openPasswordInfoModal(link)}
+                                  className="flex-shrink-0 p-1 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/10 rounded transition-all duration-200 hover:scale-110"
+                                  title="Link protegido por senha - Clique para gerenciar"
+                                >
+                                  <Lock className="w-4 h-4" />
+                                </button>
+                              )}
+                              {link.expires_at && (
+                                <button
+                                  onClick={() => openExpirationInfoModal(link)}
+                                  className="flex-shrink-0 p-1 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/10 rounded transition-all duration-200 hover:scale-110"
+                                  title={`Link expira em ${formatExpirationDate(link.expires_at).date} às ${formatExpirationDate(link.expires_at).time} - Clique para gerenciar`}
+                                >
+                                  <Clock className="w-4 h-4" />
+                                </button>
+                              )}
+                              <div
+                                className="truncate cursor-help text-sm text-gray-900 dark:text-white font-medium flex-1"
+                                title="Clique para ver URL completa"
+                              >
+                                {link.original_url}
+                              </div>
                             </div>
                             <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block z-20 bg-gray-900 dark:bg-gray-700 text-white p-3 rounded-lg shadow-xl text-xs max-w-sm break-all border border-gray-700 opacity-0 group-hover:opacity-100 transition-all duration-300">
                               <div className="font-medium mb-1">URL Original:</div>
@@ -932,28 +1181,15 @@ const ProfilePage = () => {
                           </div>
                         </td>
                         <td className="px-4 py-4">
-                          <div className="flex items-center space-x-2">
-                            {link.has_password && (
-                              <div className="flex-shrink-0">
-                                <button
-                                  onClick={() => openPasswordInfoModal(link)}
-                                  className="p-1.5 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/10 rounded-md transition-all duration-200 hover:scale-110"
-                                  title="Link protegido por senha - Clique para gerenciar"
-                                >
-                                  <Lock className="w-4 h-4" />
-                                </button>
-                              </div>
-                            )}
-                            <a
-                              href={`${baseUrl}/${link.short_url}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium text-sm truncate"
-                              title={`${baseUrl.replace('https://', '')}/${link.short_url}`}
-                            >
-                              {link.short_url}
-                            </a>
-                          </div>
+                          <a
+                            href={`${baseUrl}/${link.short_url}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium text-sm truncate"
+                            title={`${baseUrl.replace('https://', '')}/${link.short_url}`}
+                          >
+                            {link.short_url}
+                          </a>
                         </td>
                         <td className="px-4 py-4 text-center">
                           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
@@ -1027,6 +1263,7 @@ const ProfilePage = () => {
                         {modalType === 'edit' && 'Editar Link'}
                         {modalType === 'create' && 'Criar Novo Link'}
                         {modalType === 'password-info' && 'Link Protegido por Senha'}
+                        {modalType === 'expiration-info' && 'Gerenciar Data de Expiração'}
                       </h3>
                       <button
                         onClick={closeModal}
@@ -1432,6 +1669,25 @@ const ProfilePage = () => {
                           </label>
                         </div>
 
+                        <div className="flex items-center">
+                          <input
+                            id="use-expiration"
+                            name="use-expiration"
+                            type="checkbox"
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded transition-colors"
+                            checked={createUseExpiration}
+                            onChange={() => {
+                              setCreateUseExpiration(!createUseExpiration);
+                              if (!createUseExpiration) {
+                                setCreateExpirationDate('');
+                              }
+                            }}
+                          />
+                          <label htmlFor="use-expiration" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                            Adicionar data de expiração
+                          </label>
+                        </div>
+
                                                  {createUsePassword && (
                            <div className="animate-fadeIn">
                              <label htmlFor="create-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -1472,6 +1728,31 @@ const ProfilePage = () => {
                            </div>
                          )}
 
+                         {createUseExpiration && (
+                           <div className="animate-fadeIn">
+                             <label htmlFor="create-expiration-date" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                               Data e hora de expiração <span className="text-red-500">*</span>
+                             </label>
+                                                            <input
+                                 type="datetime-local"
+                                 id="create-expiration-date"
+                                 value={createExpirationDate}
+                                 min={getMinDateTime()}
+                                 max={getMaxDateTime()}
+                                                                onChange={(e) => {
+                                 handleDateTimeChange(e.target.value, setCreateExpirationDate);
+                               }}
+                                 className="block w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white sm:text-sm transition-all duration-200 hover:border-blue-400 dark:hover:border-blue-500 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-75 [&::-webkit-calendar-picker-indicator]:hover:opacity-100 [&::-webkit-calendar-picker-indicator]:hover:bg-blue-50 [&::-webkit-calendar-picker-indicator]:dark:hover:bg-blue-900/20 [&::-webkit-calendar-picker-indicator]:p-1.5 [&::-webkit-calendar-picker-indicator]:rounded [&::-webkit-calendar-picker-indicator]:transition-all [&::-webkit-calendar-picker-indicator]:duration-200 [&::-webkit-calendar-picker-indicator]:transform [&::-webkit-calendar-picker-indicator]:hover:scale-110"
+                                 style={{
+                                   colorScheme: document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+                                 }}
+                               />
+                             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                               O link será automaticamente removido após esta data e hora.
+                             </p>
+                           </div>
+                         )}
+
                         <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 border-t border-gray-200 dark:border-gray-600">
                           <button
                             type="button"
@@ -1483,7 +1764,7 @@ const ProfilePage = () => {
                           </button>
                           <button
                             type="submit"
-                            disabled={isSubmitting || !createUrl.trim() || (createUseCustomSlug && !createCustomSlug.trim()) || (createUsePassword && !createPassword.trim())}
+                            disabled={isSubmitting || !createUrl.trim() || (createUseCustomSlug && !createCustomSlug.trim()) || (createUsePassword && !createPassword.trim()) || (createUseExpiration && !createExpirationDate.trim())}
                             className="w-full sm:w-auto px-6 py-3 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           >
                             {isSubmitting ? (
@@ -1601,6 +1882,123 @@ const ProfilePage = () => {
                                 Atualizando...
                               </span>
                             ) : 'Alterar Senha'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {modalType === 'expiration-info' && selectedLink && (
+                      <div className="space-y-6">
+                        <div className="text-center">
+                          <div className="w-16 h-16 bg-gradient-to-r from-orange-100 to-red-100 dark:from-orange-900/30 dark:to-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Clock className="w-8 h-8 text-orange-600 dark:text-orange-400" />
+                          </div>
+                          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                            Gerenciar Data de Expiração
+                          </h3>
+                        </div>
+
+                        <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                          <p className="text-sm font-medium text-gray-900 dark:text-white break-all mb-2">
+                            {baseUrl.replace('https://', '')}/{selectedLink.short_url}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 break-all">
+                            → {selectedLink.original_url}
+                          </p>
+                        </div>
+
+                        <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
+                          <h4 className="text-sm font-medium text-orange-800 dark:text-orange-200 mb-2 flex items-center">
+                            <Clock className="w-4 h-4 mr-2" />
+                            Status da Expiração
+                          </h4>
+                          <ul className="text-sm text-orange-700 dark:text-orange-300 space-y-1">
+                            <li>• Este link possui data de expiração</li>
+                            <li>• Data atual: {formatExpirationDate(selectedLink.expires_at || '').date} às {formatExpirationDate(selectedLink.expires_at || '').time}</li>
+                            <li>• Você pode alterar a data ou remover a expiração</li>
+                          </ul>
+                        </div>
+
+                        <div className="space-y-4">
+                          <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                            Alterar Data de Expiração
+                          </h4>
+                          
+                          <div>
+                            <label htmlFor="new-link-expiration" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                              Nova data e hora de expiração
+                            </label>
+                                                                                      <input
+                               type="datetime-local"
+                               id="new-link-expiration"
+                               value={newLinkExpiration}
+                               min={getMinDateTime()}
+                               max={getMaxDateTime()}
+                               onChange={(e) => {
+                                 handleDateTimeChange(e.target.value, setNewLinkExpiration);
+                                 if (linkExpirationError) setLinkExpirationError('');
+                               }}
+                               className={`block w-full px-3 py-3 border rounded-md shadow-sm focus:outline-none focus:ring-2 sm:text-sm transition-all duration-200 ${
+                                 linkExpirationError 
+                                   ? 'border-red-300 dark:border-red-600 focus:ring-red-500 focus:border-red-500' 
+                                   : 'border-gray-300 dark:border-gray-600 focus:ring-orange-500 focus:border-orange-500 hover:border-orange-400 dark:hover:border-orange-500'
+                               } dark:bg-gray-700 dark:text-white [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-75 [&::-webkit-calendar-picker-indicator]:hover:opacity-100 [&::-webkit-calendar-picker-indicator]:hover:bg-orange-50 [&::-webkit-calendar-picker-indicator]:dark:hover:bg-orange-900/20 [&::-webkit-calendar-picker-indicator]:p-1.5 [&::-webkit-calendar-picker-indicator]:rounded [&::-webkit-calendar-picker-indicator]:transition-all [&::-webkit-calendar-picker-indicator]:duration-200 [&::-webkit-calendar-picker-indicator]:transform [&::-webkit-calendar-picker-indicator]:hover:scale-110`}
+                               style={{
+                                 colorScheme: document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+                               }}
+                               disabled={isSubmitting}
+                             />
+                            {linkExpirationError && (
+                              <p className="mt-2 text-sm text-red-600 dark:text-red-400">{linkExpirationError}</p>
+                            )}
+                                                         {!linkExpirationError && (
+                               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                 Deixe vazio para remover a expiração ou defina uma nova data no futuro.
+                               </p>
+                             )}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 border-t border-gray-200 dark:border-gray-600">
+                          <button
+                            type="button"
+                            onClick={closeModal}
+                            disabled={isSubmitting}
+                            className="w-full sm:w-auto px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleRemoveLinkExpiration}
+                            disabled={isSubmitting}
+                            className="w-full sm:w-auto px-6 py-3 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-w-[150px]"
+                          >
+                            {isSubmitting ? (
+                              <span className="flex items-center justify-center">
+                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Removendo...
+                              </span>
+                            ) : 'Remover Expiração'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleUpdateLinkExpiration}
+                            disabled={isSubmitting}
+                            className="w-full sm:w-auto px-6 py-3 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-w-[150px]"
+                          >
+                            {isSubmitting ? (
+                              <span className="flex items-center justify-center">
+                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Atualizando...
+                              </span>
+                            ) : 'Salvar Alterações'}
                           </button>
                         </div>
                       </div>

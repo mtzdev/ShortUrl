@@ -8,6 +8,7 @@ class LinkCreateSchema(BaseModel):
     short_url: Optional[str] = Field(default=None)
     user_id: Optional[int] = Field(default=None)
     password: Optional[str] = Field(default=None)
+    expires_at: Optional[datetime] = Field(default=None)
 
 class LinkCreateResponseSchema(BaseModel):
     id: int
@@ -26,6 +27,7 @@ class LinkStatsSchema(BaseModel):
     clicks: int
     created_at: datetime
     has_password: bool = Field(default=False)
+    expires_at: Optional[datetime] = Field(default=None)
 
 class LoginRequestSchema(BaseModel):
     email: EmailStr
@@ -79,6 +81,9 @@ class LinkUpdateSchema(BaseModel):
 
 class LinkPasswordUpdateSchema(BaseModel):
     password: str
+
+class LinkExpirationUpdateSchema(BaseModel):
+    expires_at: Optional[datetime] = Field(default=None)
 
 class UsernameUpdateSchema(BaseModel):
     username: str

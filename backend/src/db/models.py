@@ -26,6 +26,7 @@ class Link:
     password: Mapped[Optional[str]] = mapped_column(nullable=True, default=None)
     clicks: Mapped[int] = mapped_column(default=0)
     created_at: Mapped[datetime] = mapped_column(init=False, server_default=func.now())
+    expires_at: Mapped[Optional[datetime]] = mapped_column(nullable=True, default=None)
 
 @table_registry.mapped_as_dataclass
 class RefreshToken:

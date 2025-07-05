@@ -1,3 +1,4 @@
+from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI, Request
 from src.routes import url, auth
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,6 +28,10 @@ async def rate_limit_exception_handler(request: Request, exc: RateLimitExceeded)
         status_code=429,
         content={"detail": "Você atingiu o limite de requisições. Por favor, tente novamente mais tarde."}
     )
+
+scheduler = BackgroundScheduler()
+scheduler.add_job(url.clean_expired_links, 'cron', hour=0, minute=0)
+scheduler.start()
 
 if __name__ == '__main__':
     uvicorn.run(app, host='0.0.0.0', port=80, reload=False)
