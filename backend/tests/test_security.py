@@ -2,7 +2,8 @@ import pytest
 from starlette.responses import Response
 from freezegun import freeze_time
 import uuid
-from src.security import generate_password_hash, verify_password, generate_jwt_token, decode_jwt_token, get_user
+from src.db.models import RefreshToken
+from src.security import generate_password_hash, verify_password, generate_jwt_token, decode_jwt_token, get_user, generate_session_id
 
 def test_generate_password_hash():
     password = 'password123'
@@ -90,3 +91,33 @@ def test_get_user_with_no_registered_user(request_mock, db_session):
     user_data = get_user(request_mock, Response(), db_session)
 
     assert user_data is False
+
+def test_get_user_with_refresh_token_expired(request_mock, user, db_session):
+    session_id = generate_session_id(Response())
+    with freeze_time('2025-01-01 00:00:00'):
+        token = generate_jwt_token(user.id, user.username, session_id, request_mock, Response(), False, db_session)
+
+        request_mock.cookies = {
+            'session_id': session_id,
+            'refresh_token': token['refresh_token']
+        }
+
+    with freeze_time('2025-01-02 00:01:00'):
+        user = get_user(request_mock, Response(), db_session)
+
+        assert user is False
+        refresh_db = db_session.query(RefreshToken).filter(RefreshToken.session_id == session_id).first()
+        assert refresh_db.is_active is False
+
+def test_get_user_with_access_token_invalid(request_mock, user, db_session):
+    request_mock.cookies = {
+        'access_token': 'invalid_token',
+        'session_id': user.session_id,
+        'refresh_token': user.token_refresh
+    }
+
+    user_data = get_user(request_mock, Response(), db_session)
+    assert user_data is not False
+    assert user_data['id'] == user.id
+    assert user_data['username'] == user.username
+    assert user_data['email'] == user.email

@@ -1,4 +1,4 @@
-from src.db.models import User
+from src.db.models import RefreshToken, User
 
 def test_login_non_existent_user(client):
     response = client.post('/api/auth/login', json={'email': 'email@test.com', 'password': 'test_password'})
@@ -175,3 +175,12 @@ def test_update_password_success(logged_client):
 
     assert response.status_code == 200
     assert response.json() == {'message': 'Password updated successfully'}
+
+def test_logout_success(logged_client, db_session):
+    response = logged_client.post('/api/auth/logout')
+
+    assert response.status_code == 200
+    assert response.json() == {'message': 'Successfully logged out'}
+
+    refresh_db = db_session.query(RefreshToken).filter(RefreshToken.session_id == logged_client.cookies['session_id']).first()
+    assert refresh_db.is_active is False

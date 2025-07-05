@@ -94,6 +94,12 @@ def test_create_url_with_existing_short_url(client, simple_url):
     assert response.status_code == 400
     assert response.json()['detail'] == 'Short URL already exists'
 
+def test_create_url_with_invalid_password(client):
+    response = client.post('/api/short', json={'original_url': 'https://www.google.com.br/', 'password': '12'})
+
+    assert response.status_code == 400
+    assert response.json()['detail'] == 'Password must be at least 3 characters long'
+
 def test_create_url_with_password(client, db_session):
     response = client.post('/api/short', json={'original_url': 'https://www.google.com.br/', 'password': '123456'})
 
@@ -172,6 +178,30 @@ def test_update_short_url_success(logged_client, url_with_user):
 
     assert response.status_code == 200
     assert response.json()['short_url'] == 'new_shorturl'
+
+def test_update_url_password_with_invalid_user(client_with_invalid_user):
+    response = client_with_invalid_user.patch('/api/short/teste/password', json={'password': '123456'})
+
+    assert response.status_code == 401
+    assert response.json()['detail'] == 'You must be logged in to access this resource'
+
+def test_update_url_with_invalid_password(logged_client):
+    response = logged_client.patch('/api/short/teste/password', json={'password': '12'})
+
+    assert response.status_code == 400
+    assert response.json()['detail'] == 'Password must be at least 3 characters long'
+
+def test_update_url_password_with_non_existent_link(logged_client):
+    response = logged_client.patch('/api/short/teste/password', json={'password': '123456'})
+
+    assert response.status_code == 404
+    assert response.json()['detail'] == 'Link not found'
+
+def test_update_url_password_success(logged_client, url_with_user):
+    response = logged_client.patch(f'/api/short/{url_with_user.short_url}/password', json={'password': '123456'})
+
+    assert response.status_code == 200
+    assert response.json() == {'message': 'Password updated successfully'}
 
 def test_delete_short_url_with_invalid_user(client_with_invalid_user):
     response = client_with_invalid_user.delete('/api/short/teste')
