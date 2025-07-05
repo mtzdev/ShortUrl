@@ -32,15 +32,15 @@ def get_url(short_id: str, request: Request, password: str = Header(default=None
     if not link:
         raise HTTPException(status_code=404, detail="Link not found")
 
+    if link.expires_at and link.expires_at < datetime.now(timezone.utc).replace(tzinfo=None):
+        db.delete(link)
+        db.commit()
+        raise HTTPException(status_code=404, detail="Link not found")
+
     if link.password and not password:
         raise HTTPException(status_code=401, detail="Link is password protected")
     if link.password and not verify_password(password, link.password):
         raise HTTPException(status_code=401, detail="Invalid password")
-
-    if link.expires_at and link.expires_at < datetime.now(timezone.utc):
-        db.delete(link)
-        db.commit()
-        raise HTTPException(status_code=404, detail="Link not found")
 
     return {'original_url': link.original_url, 'clicks': link.clicks, 'created_at': link.created_at}
 
@@ -80,7 +80,7 @@ def create_url(url: LinkCreateSchema, request: Request, response: Response, db: 
         link.user_id = user['id']
 
     if url.expires_at:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         expiration_date = url.expires_at.replace(tzinfo=None)
 
         if expiration_date <= now + timedelta(minutes=5):
@@ -169,7 +169,7 @@ def update_link_expiration(short_id: str, expiration: LinkExpirationUpdateSchema
         raise HTTPException(status_code=401, detail="You must be logged in to access this resource")
 
     if expiration.expires_at:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         expiration_date = expiration.expires_at.replace(tzinfo=None)
 
         if expiration_date <= now + timedelta(minutes=5):

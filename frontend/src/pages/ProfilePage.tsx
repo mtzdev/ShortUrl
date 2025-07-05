@@ -120,11 +120,22 @@ const ProfilePage = () => {
   const getMinDateTime = () => {
     const now = new Date();
     now.setMinutes(now.getMinutes() + 5); // Mínimo 5 minutos no futuro
-    return now.toISOString().slice(0, 16);
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
 
   const getMaxDateTime = () => {
     return '2999-12-31T23:59';
+  };
+
+  const convertLocalDateTimeToUTC = (localDateTime: string): string => {
+    const localDate = new Date(localDateTime);
+    return localDate.toISOString();
   };
 
   const handleDateTimeChange = (dateValue: string, setter: (value: string) => void) => {
@@ -205,8 +216,8 @@ const ProfilePage = () => {
       return 'Ano da data de expiração não pode ser maior que 2999';
     }
     
-    now.setMinutes(now.getMinutes() + 5);
-    if (selectedDate <= now) {
+    const minValidDate = new Date(now.getTime() + 5 * 60 * 1000);
+    if (selectedDate <= minValidDate) {
       return 'Data de expiração deve ser pelo menos 5 minutos no futuro';
     }
     return '';
@@ -459,7 +470,7 @@ const ProfilePage = () => {
         },
         credentials: 'include',
         body: JSON.stringify({
-          expires_at: newLinkExpiration ? new Date(newLinkExpiration).toISOString() : null,
+          expires_at: newLinkExpiration ? convertLocalDateTimeToUTC(newLinkExpiration) : null,
         }),
       });
 
@@ -576,7 +587,7 @@ const ProfilePage = () => {
           original_url: createUrl,
           short_url: createUseCustomSlug ? createCustomSlug : undefined,
           password: createUsePassword ? createPassword : undefined,
-          expires_at: createUseExpiration ? new Date(createExpirationDate).toISOString() : undefined,
+          expires_at: createUseExpiration ? convertLocalDateTimeToUTC(createExpirationDate) : undefined,
         }),
       });
 
