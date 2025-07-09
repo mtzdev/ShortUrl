@@ -3,7 +3,7 @@ name: CI/CD Pipeline
 on: [push, pull_request]
 
 jobs:
-  backend-tests:
+  tests:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -30,3 +30,27 @@ jobs:
       
       - name: Testes
         run: poetry run pytest -s -v
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: tests
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Preparar pasta de deploy
+        run: |
+          mkdir deploy
+          cp backend/poetry.lock deploy/
+          cp backend/pyproject.toml deploy/
+          cp -r backend/src deploy/
+          ls -la deploy/
+
+      - name: Deploy
+        uses: squarecloudofc/github-action@v2.0.1
+        with:
+          run: commit ${{ secrets.SQUARE_APPLICATION_ID }}
+          token: '${{ secrets.SQUARE_TOKEN }}'
+          workdir: deploy
