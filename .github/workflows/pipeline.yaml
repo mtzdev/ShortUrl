@@ -51,6 +51,6 @@ jobs:
       - name: Deploy
         uses: squarecloudofc/github-action@v2.0.1
         with:
-          run: commit ${{ secrets.SQUARE_APPLICATION_ID }}
+          command: commit ${{ secrets.SQUARE_APPLICATION_ID }} --restart
           token: '${{ secrets.SQUARE_TOKEN }}'
           workdir: deploy
