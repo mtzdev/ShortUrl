@@ -115,10 +115,15 @@ def get_user(request: Request, response: Response, db: Session = Depends(get_db)
 
     refresh_token_db = db.query(RefreshToken).filter(
         RefreshToken.refresh_token == refresh_token, RefreshToken.session_id == session_id,
-        RefreshToken.user_agent == get_user_agent(request), RefreshToken.is_active.is_(True)).first()
+        RefreshToken.is_active.is_(True)).first()
 
     if refresh_token_db:
-        if refresh_token_db.expires_at < datetime.now(timezone.utc).replace(tzinfo=None):  # Token expirado
+        if (
+            refresh_token_db.expires_at < datetime.now(timezone.utc).replace(tzinfo=None) or  # link expirado
+            refresh_token_db.user_agent != get_user_agent(request) or  # user agent diferente
+            refresh_token_db.user_ip != get_user_ip(request)  # ip diferente
+        ):
+
             refresh_token_db.is_active = False
             db.commit()
             clear_auth_cookie(response)
