@@ -1334,6 +1334,23 @@ const ProfilePage = () => {
 
                     {modalType === 'email' && (
                       <form onSubmit={handleEmailSubmit} className="space-y-6">
+                        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-6">
+                          <div className="flex items-start">
+                            <div className="flex-shrink-0">
+                              <svg className="h-5 w-5 text-amber-500 dark:text-amber-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.314 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                              </svg>
+                            </div>
+                            <div className="ml-3">
+                              <h3 className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                                Aviso de Segurança
+                              </h3>
+                              <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                                Ao alterar seu e-mail, todas as outras sessões ativas serão automaticamente desconectadas por segurança. Apenas a sessão atual permanecerá ativa.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
                         <div>
                           <label htmlFor="current-email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             E-mail atual
@@ -1409,6 +1426,23 @@ const ProfilePage = () => {
 
                     {modalType === 'password' && (
                       <form onSubmit={handlePasswordSubmit} className="space-y-6">
+                        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-6">
+                          <div className="flex items-start">
+                            <div className="flex-shrink-0">
+                              <svg className="h-5 w-5 text-amber-500 dark:text-amber-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.314 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                              </svg>
+                            </div>
+                            <div className="ml-3">
+                              <h3 className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                                Aviso de Segurança
+                              </h3>
+                              <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                                Ao alterar sua senha, todas as outras sessões ativas serão automaticamente desconectadas por segurança. Apenas a sessão atual permanecerá ativa.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
                         <div>
                           <label htmlFor="current-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Senha atual

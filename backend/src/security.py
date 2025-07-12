@@ -149,6 +149,18 @@ def get_user(request: Request, response: Response, db: Session = Depends(get_db)
     clear_auth_cookie(response)
     return False
 
+def invalidate_all_sessions(user_id: int, session_id: str, keep_current_session: bool, db: Session):
+    query = db.query(RefreshToken).filter(
+        RefreshToken.user_id == user_id,
+        RefreshToken.is_active.is_(True)
+    )
+
+    if keep_current_session:
+        query = query.filter(RefreshToken.session_id != session_id)
+
+    query.update({'is_active': False})
+    db.commit()
+
 def clear_auth_cookie(response: Response):
     response.set_cookie(
         key='access_token',

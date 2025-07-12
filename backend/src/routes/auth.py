@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from src.db.database import get_db
 from src.db.models import User, RefreshToken
-from src.security import get_user, verify_password, generate_password_hash, generate_jwt_token, clear_auth_cookie, generate_session_id
+from src.security import get_user, verify_password, generate_password_hash, generate_jwt_token, clear_auth_cookie, generate_session_id, invalidate_all_sessions
 from src.schemas import LoginRequestSchema, RegisterRequestSchema, LoginResponseSchema, UsernameUpdateSchema, EmailUpdateSchema, PasswordUpdateSchema
 from src.utils import limiter
 from sqlalchemy.orm import Session
@@ -105,6 +105,7 @@ def update_email(new: EmailUpdateSchema, request: Request, response: Response, d
     user_db = db.query(User).filter(User.id == user['id']).first()
     user_db.email = new.email
     db.commit()
+    invalidate_all_sessions(user['id'], request.cookies.get('session_id'), True, db)
     return {'message': 'E-mail updated successfully'}
 
 @router.patch('/me/password')
@@ -120,4 +121,5 @@ def update_password(new: PasswordUpdateSchema, request: Request, response: Respo
 
     user_db.password = generate_password_hash(new.password)
     db.commit()
+    invalidate_all_sessions(user['id'], request.cookies.get('session_id'), True, db)
     return {'message': 'Password updated successfully'}
