@@ -121,7 +121,7 @@ def get_user(request: Request, response: Response, db: Session = Depends(get_db)
         if (
             refresh_token_db.expires_at < datetime.now(timezone.utc).replace(tzinfo=None) or  # link expirado
             refresh_token_db.user_agent != get_user_agent(request) or  # user agent diferente
-            refresh_token_db.user_ip != get_user_ip(request)  # ip diferente
+            refresh_token_db.ip_address != get_user_ip(request)  # ip diferente
         ):
 
             refresh_token_db.is_active = False
