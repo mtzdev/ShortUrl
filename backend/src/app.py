@@ -7,6 +7,9 @@ from slowapi.middleware import SlowAPIMiddleware
 from slowapi.errors import RateLimitExceeded
 from src.utils import limiter
 import uvicorn
+from src.logger import setup_discord_logging, logger
+
+setup_discord_logging()
 
 app = FastAPI(docs_url=None, redoc_url=None)
 app.state.limiter = limiter
@@ -35,3 +38,4 @@ scheduler.start()
 
 if __name__ == '__main__':
     uvicorn.run(app, host='0.0.0.0', port=80, reload=False)
+    logger.info("API iniciada!")

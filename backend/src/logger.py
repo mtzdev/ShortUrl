@@ -12,7 +12,7 @@ def send_webhook(message: str, webhook_url: str):
                 async with httpx.AsyncClient(timeout=5) as client:
                     await client.post(webhook_url, json={"content": message})
             except Exception as e:
-                logger.warning(f"[Log Error]: {e}")
+                logger.error(f"[Log Error]: {e}")
 
         asyncio.run(task())
 
