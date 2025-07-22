@@ -48,9 +48,20 @@ jobs:
           cp -r backend/src deploy/
           ls -la deploy/
 
+      - name: Instalar CLI Squarecloud
+        run: |
+          wget https://github.com/squarecloudofc/cli/releases/download/v2.4.13/squarecloud_linux_amd64.tar.gz -O /tmp/squarecloud.tar.gz
+          tar -xzf /tmp/squarecloud.tar.gz -C /tmp/
+          chmod +x /tmp/squarecloud
+          sudo mv /tmp/squarecloud /usr/local/bin/squarecloud
+
+      - name: Fazer login na CLI
+        run: squarecloud auth login --token="${{ secrets.SQUARE_TOKEN }}"
+      
       - name: Deploy
-        uses: squarecloudofc/github-action@v2.0.1
-        with:
-          command: commit ${{ secrets.SQUARE_APPLICATION_ID }} --restart
-          token: '${{ secrets.SQUARE_TOKEN }}'
-          workdir: deploy
+        run: |
+          cd deploy
+          squarecloud commit ${{ secrets.SQUARE_APPLICATION_ID }}
+
+      - name: Restart
+        run: squarecloud app restart ${{ secrets.SQUARE_APPLICATION_ID }}
