@@ -10,6 +10,9 @@ from src.db.database import get_db
 from src.db.models import Link, User
 from src.security import generate_password_hash, generate_jwt_token, generate_session_id
 from unittest.mock import MagicMock
+from src.logger import logger
+
+logger.remove()
 
 @fixture()
 def client(db_session: Session):
