@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 import threading
 import httpx
 from loguru import logger
@@ -18,11 +19,12 @@ def send_webhook(message: str, webhook_url: str):
     threading.Thread(target=runner, daemon=True).start()
 
 def info_sink(message):
-    send_webhook(f"[{message.record['level'].name}]: {message.record['message']}", WEBHOOK_INFO)
+    send_webhook(f"**[{message.record['level'].name}]** {message.record['message']}\n-# **{datetime.now().strftime('%d/%m/%Y - %H:%M:%S')}**", WEBHOOK_INFO)
 
 def error_sink(message):
-    send_webhook(f"[{message.record['level'].name}]: {message.record['message']}", WEBHOOK_ERROR)
+    send_webhook(f"**[{message.record['level'].name}]** {message.record['message']}\n-# **{datetime.now().strftime('%d/%m/%Y - %H:%M:%S')}**", WEBHOOK_ERROR)
 
 def setup_discord_logging():
+    logger.remove()
     logger.add(info_sink, level="INFO", filter=lambda r: r["level"].name in ("INFO", "WARNING"))
     logger.add(error_sink, level="ERROR", filter=lambda r: r["level"].name in ("ERROR", "CRITICAL"))
