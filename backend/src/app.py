@@ -5,8 +5,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.errors import RateLimitExceeded
-from src.utils import limiter
+from src.utils import limiter, get_user_ip
 import uvicorn
+from src.logger import setup_discord_logging, logger
+
+setup_discord_logging()
 
 app = FastAPI(docs_url=None, redoc_url=None)
 app.state.limiter = limiter
@@ -22,6 +25,14 @@ app.add_middleware(
     allow_headers=['*'],
 )
 
+@app.middleware("http")
+async def capture_exceptions(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except Exception as exc:
+        logger.critical(f"`{request.method} {request.url.path}` Erro não tratado!\n- IP: {get_user_ip(request)} - Session ID: {request.cookies.get('session_id')}\n```{exc}```")
+        return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
+
 @app.exception_handler(RateLimitExceeded)
 async def rate_limit_exception_handler(request: Request, exc: RateLimitExceeded):
     return JSONResponse(
@@ -35,3 +46,4 @@ scheduler.start()
 
 if __name__ == '__main__':
     uvicorn.run(app, host='0.0.0.0', port=80, reload=False)
+    logger.info("API iniciada!")

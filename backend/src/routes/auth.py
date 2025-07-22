@@ -4,8 +4,9 @@ from src.db.database import get_db
 from src.db.models import User, RefreshToken
 from src.security import get_user, verify_password, generate_password_hash, generate_jwt_token, clear_auth_cookie, generate_session_id, invalidate_all_sessions
 from src.schemas import LoginRequestSchema, RegisterRequestSchema, LoginResponseSchema, UsernameUpdateSchema, EmailUpdateSchema, PasswordUpdateSchema
-from src.utils import limiter
+from src.utils import limiter, get_user_ip
 from sqlalchemy.orm import Session
+from src.logger import logger
 
 router = APIRouter()
 
@@ -14,13 +15,16 @@ router = APIRouter()
 def login(login: LoginRequestSchema, request: Request, response: Response, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == login.email).first()
     if not user:
+        logger.warning(f"`/auth/login`: Tentativa de login com email inexistente\n```Email: {login.email}\nIP: {get_user_ip(request)} | User-Agent: {request.headers.get('User-Agent')}```")
         raise HTTPException(status_code=401, detail='E-mail ou senha estão inválidos. Por favor, tente novamente.')
 
     if not verify_password(login.password, user.password):
+        logger.warning(f"`/auth/login`: Tentativa de login com senha inválida\n```Email: {login.email}\nIP: {get_user_ip(request)} | User-Agent: {request.headers.get('User-Agent')}```")
         raise HTTPException(status_code=401, detail='E-mail ou senha estão inválidos. Por favor, tente novamente.')
 
     session_id = generate_session_id(response)
     token = generate_jwt_token(user.id, user.username, session_id, request, response, login.remember, db)
+    logger.info(f"`/auth/login`: Login realizado com sucesso\n```Email: {login.email}\nIP: {get_user_ip(request)} | User-Agent: {request.headers.get('User-Agent')}```")
     return {
         'access_token': token['access_token'],
         'refresh_token': token['refresh_token'],
@@ -35,12 +39,15 @@ def login(login: LoginRequestSchema, request: Request, response: Response, db: S
 @limiter.limit("3/minute;15/day")
 def register(register: RegisterRequestSchema, request: Request, response: Response, db: Session = Depends(get_db)):
     if register.password != register.confirm_password:
+        logger.warning(f"`/auth/register`: Tentativa de registro com senhas diferentes\n```Username: {register.username} - Email: {register.email}\nIP: {get_user_ip(request)} | User-Agent: {request.headers.get('User-Agent')}```")
         raise HTTPException(status_code=400, detail='As senhas não coincidem. Verifique se as senhas estão iguais.')
 
     if db.query(User).filter(User.username == register.username).first():
+        logger.warning(f"`/auth/register`: Tentativa de registro com username já existente\n```Username: {register.username} - Email: {register.email}\nIP: {get_user_ip(request)} | User-Agent: {request.headers.get('User-Agent')}```")
         raise HTTPException(status_code=409, detail='Nome de usuário já registrado. Por favor, tente outro nome de usuário.')
 
     if db.query(User).filter(User.email == register.email).first():
+        logger.warning(f"`/auth/register`: Tentativa de registro com e-mail já existente\n```Username: {register.username} - Email: {register.email}\nIP: {get_user_ip(request)} | User-Agent: {request.headers.get('User-Agent')}```")
         raise HTTPException(status_code=409, detail='E-mail já registrado. Por favor, tente outro e-mail.')
 
     user = User(username=register.username, email=register.email, password=generate_password_hash(register.password))
@@ -50,6 +57,7 @@ def register(register: RegisterRequestSchema, request: Request, response: Respon
 
     session_id = generate_session_id(response)
     token = generate_jwt_token(user.id, user.username, session_id, request, response, True, db)
+    logger.info(f"`/auth/register`: Registro realizado com sucesso\n```Username: {register.username} - Email: {register.email}\nIP: {get_user_ip(request)} | User-Agent: {request.headers.get('User-Agent')}```")
     return {
         'access_token': token['access_token'],
         'refresh_token': token['refresh_token'],
@@ -66,6 +74,7 @@ def logout(response: Response, request: Request, db: Session = Depends(get_db)):
     if session_id:
         db.query(RefreshToken).filter(RefreshToken.session_id == session_id).update({'is_active': False})
         db.commit()
+        logger.info(f"`/auth/logout`: Logout realizado com sucesso\n```Session ID: {session_id}\nIP: {get_user_ip(request)} | User-Agent: {request.headers.get('User-Agent')}```")
 
     clear_auth_cookie(response)
     return {'message': 'Successfully logged out'}
@@ -82,6 +91,7 @@ def get_current_user(request: Request, response: Response, db: Session = Depends
 def update_username(new: UsernameUpdateSchema, request: Request, response: Response, db: Session = Depends(get_db)):
     user = get_user(request, response, db)
     if not user:
+        logger.warning(f"`/auth/me/username`: Tentativa com token inválido\n```IP: {get_user_ip(request)} | User-Agent: {request.headers.get('User-Agent')}```")
         raise HTTPException(status_code=401, detail='Invalid token or user not found')
 
     if db.query(User).filter(User.username == new.username).first():
@@ -90,6 +100,7 @@ def update_username(new: UsernameUpdateSchema, request: Request, response: Respo
     user_db = db.query(User).filter(User.id == user['id']).first()
     user_db.username = new.username
     db.commit()
+    logger.info(f"`/auth/me/username`: Username atualizado com sucesso\n```Username: {user['username']} -> {new.username}\nSession ID: {request.cookies.get('session_id')}\nIP: {get_user_ip(request)} | User-Agent: {request.headers.get('User-Agent')}```")
     return {'message': 'Username updated successfully'}
 
 @router.patch('/me/email')
@@ -97,6 +108,7 @@ def update_username(new: UsernameUpdateSchema, request: Request, response: Respo
 def update_email(new: EmailUpdateSchema, request: Request, response: Response, db: Session = Depends(get_db)):
     user = get_user(request, response, db)
     if not user:
+        logger.warning(f"`/auth/me/email`: Tentativa com token inválido\n```IP: {get_user_ip(request)} | User-Agent: {request.headers.get('User-Agent')}```")
         raise HTTPException(status_code=401, detail='Invalid token or user not found')
 
     if db.query(User).filter(User.email == new.email).first():
@@ -106,6 +118,7 @@ def update_email(new: EmailUpdateSchema, request: Request, response: Response, d
     user_db.email = new.email
     db.commit()
     invalidate_all_sessions(user['id'], request.cookies.get('session_id'), True, db)
+    logger.info(f"`/auth/me/email`: E-mail atualizado com sucesso\n```Email: {user['email']} -> {new.email}\nSession ID: {request.cookies.get('session_id')}\nIP: {get_user_ip(request)} | User-Agent: {request.headers.get('User-Agent')}```")
     return {'message': 'E-mail updated successfully'}
 
 @router.patch('/me/password')
@@ -113,6 +126,7 @@ def update_email(new: EmailUpdateSchema, request: Request, response: Response, d
 def update_password(new: PasswordUpdateSchema, request: Request, response: Response, db: Session = Depends(get_db)):
     user = get_user(request, response, db)
     if not user:
+        logger.warning(f"`/auth/me/password`: Tentativa com token inválido\n```IP: {get_user_ip(request)} | User-Agent: {request.headers.get('User-Agent')}```")
         raise HTTPException(status_code=401, detail='Invalid token or user not found')
 
     user_db = db.query(User).filter(User.id == user['id']).first()
@@ -122,4 +136,5 @@ def update_password(new: PasswordUpdateSchema, request: Request, response: Respo
     user_db.password = generate_password_hash(new.password)
     db.commit()
     invalidate_all_sessions(user['id'], request.cookies.get('session_id'), True, db)
+    logger.info(f"`/auth/me/password`: Senha atualizada com sucesso\n```Email: {user['email']} - Session ID: {request.cookies.get('session_id')}\nIP: {get_user_ip(request)} | User-Agent: {request.headers.get('User-Agent')}```")
     return {'message': 'Password updated successfully'}

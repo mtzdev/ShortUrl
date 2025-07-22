@@ -7,6 +7,7 @@ from src.db.database import get_db
 from src.db.models import User, RefreshToken
 from src.settings import JWT_SECRET_KEY, JWT_EXPIRATION_TIME
 from src.utils import get_user_agent, get_user_ip
+from src.logger import logger
 import hashlib
 import secrets
 import uuid
@@ -51,6 +52,7 @@ def generate_jwt_token(user_id: int, username: str, session_id: str,
         secure=True,
         samesite='none'
     )
+    logger.info(f"`generate_jwt_token`: Token JWT gerado com sucesso\n```User ID: {user_id} - Username: {username} - Session ID: {session_id}\nIP: {get_user_ip(request)} | User-Agent: {request.headers.get('User-Agent')}```")
     return {'access_token': jwt, 'refresh_token': refresh_token}
 
 def generate_refresh_token(user_id: int, session_id: str, request: Request, remember: bool, db: Session):
@@ -83,6 +85,7 @@ def decode_jwt_token(token: str):
     except ExpiredSignatureError:
         raise HTTPException(status_code=401, detail='Token expired')
     except (InvalidAlgorithmError, InvalidSignatureError, InvalidTokenError):
+        logger.error(f"`decode_jwt_token`: Token JWT inválido\n```Token: {token}```")
         raise HTTPException(status_code=401, detail='Invalid token')
 
     return jwt
@@ -106,7 +109,8 @@ def get_user(request: Request, response: Response, db: Session = Depends(get_db)
                 'username': user.username,
                 'email': user.email
             }
-    except Exception:
+    except Exception as e:
+        logger.error(f"`get_user`: Erro ao decodificar token JWT\n```Token: {token}\nError: {e}```")
         pass
 
     if not refresh_token:
